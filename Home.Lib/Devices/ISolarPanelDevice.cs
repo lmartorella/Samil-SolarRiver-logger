@@ -1,5 +1,5 @@
-﻿
-using Lucky.Home.Db;
+﻿using Lucky.Home.Db;
+using Lucky.Home.Power;
 
 namespace Lucky.Home.Devices
 {
@@ -15,6 +15,6 @@ namespace Lucky.Home.Devices
         /// </summary>
         double ImmediatePower { get; }
 
-        ITimeSeries Database { get; set; }
+        ITimeSeries<PowerData> Database { get; set; }
     }
 }

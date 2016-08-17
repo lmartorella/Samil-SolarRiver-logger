@@ -4,6 +4,7 @@ using Lucky.Home.Sinks;
 using System.Threading;
 using System.Linq;
 using Lucky.Services;
+using Lucky.Home.Power;
 
 namespace Lucky.Home.Devices
 {
@@ -29,7 +30,7 @@ namespace Lucky.Home.Devices
 
         public string Name { get; private set; }
 
-        public ITimeSeries Database { get; set; }
+        public ITimeSeries<PowerData> Database { get; set; }
 
         public double ImmediatePower { get; private set; }
 
