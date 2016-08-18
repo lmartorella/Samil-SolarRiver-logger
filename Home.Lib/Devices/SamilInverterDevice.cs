@@ -5,6 +5,7 @@ using System.Threading;
 using System.Linq;
 using Lucky.Services;
 using Lucky.Home.Power;
+using System.Text;
 
 namespace Lucky.Home.Devices
 {
@@ -54,6 +55,15 @@ namespace Lucky.Home.Devices
             // Establish connection (Samil protocol)
             //...
             // Update ImmediatePower
+            string csv = Encoding.ASCII.GetString(line.Receive());
+            string[] parts = csv.Split(',');
+
+            Database?.AddNewSample(new PowerData
+            {
+                PowerW = double.Parse(parts[0]),
+                CurrentA = double.Parse(parts[1]),
+                TensionV = double.Parse(parts[2])
+            }, DateTime.Now);
         }
     }
 }
