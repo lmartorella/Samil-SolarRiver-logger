@@ -57,7 +57,7 @@ namespace Lucky.Home.Power
 
         public string ToCsv()
         {
-            return string.Format("{0:0},{1:2},{2:1}", PowerW, CurrentA, TensionV);
+            return string.Format("{0:0},{1:0.00},{2:0.0}", PowerW, CurrentA, TensionV);
         }
     }
 }
