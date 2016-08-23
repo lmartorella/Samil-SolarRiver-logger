@@ -10,10 +10,7 @@ namespace Lucky.Home.Devices
         /// </summary>
         string Name { get; }
 
-        /// <summary>
-        /// In kW
-        /// </summary>
-        double ImmediatePower { get; }
+        PowerData ImmediateData { get; }
 
         ITimeSeries<PowerData> Database { get; set; }
     }
