@@ -7,6 +7,7 @@ using Lucky.Services;
 using Lucky.Home.Power;
 using System.Text;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace Lucky.Home.Devices
 {
@@ -44,30 +45,64 @@ namespace Lucky.Home.Devices
 
         private class SamilMsg
         {
+            private List<byte> _bytes;
+            private static readonly SamilMsg Invalid = new SamilMsg(0xFFFF, 0xFFFF, 0xFF, 0xFF);
+
             public SamilMsg(ushort from, ushort to, byte cmd, byte subcmd, byte[] payload = null)
             {
                 From = from;
                 To = to;
-                Cmd = cmd;
-                SubCmd = subcmd;
+                Cmd = (ushort)(cmd << 8 + subcmd);
                 Payload = payload ?? new byte[0];
+
+                _bytes = new List<byte>(11 + payload.Length);
+                PushW(0x55AA);
+                PushW(From);
+                PushW(To);
+                PushW(Cmd);
+                _bytes.Add((byte)payload.Length);
+                _bytes.AddRange(payload);
+                PushW(_bytes.Aggregate((ushort)0, (b1, b2) => (ushort)(b1 + b2)));
+            }
+
+            private void PushW(ushort w)
+            {
+                byte[] v = BitConverter.GetBytes(w);
+                if (BitConverter.IsLittleEndian)
+                {
+                    _bytes.Add(v[1]);
+                    _bytes.Add(v[0]);
+                }
+                else
+                {
+                    _bytes.AddRange(v);
+                }
             }
 
             public ushort From;
             public ushort To;
-            public byte Cmd;
-            public byte SubCmd;
+            public ushort Cmd;
             public byte[] Payload;
 
             public byte[] ToBytes()
             {
-                throw new NotImplementedException();
+                return _bytes.ToArray();
             }
 
             public static SamilMsg FromBytes(byte[] data)
             {
-                // Transform null in empty message
-                throw new NotImplementedException();
+                // Transform null in invalid message
+                if (data == null || data.Length < 11)
+                {
+                    return Invalid;
+                }
+                var checksum = data.Take(data.Length - 2).Aggregate((ushort)0, (b1, b2) => (ushort)(b1 + b2));
+                int l = data[8];
+                if (WordAt(0, data) != 0x55aa || WordAt(data.Length - 2, data) != checksum || l != data.Length - 11)
+                {
+                    return Invalid;
+                }
+                return new SamilMsg(WordAt(2, data), WordAt(4, data), data[6], data[7], data.Skip(9).Take(l).ToArray());
             }
 
             internal SamilMsg Clone()
@@ -77,17 +112,29 @@ namespace Lucky.Home.Devices
 
             public override string ToString()
             {
-                throw new NotImplementedException();
+                return string.Join(",", _bytes.Select(b => b.ToString()));
             }
 
             internal bool CheckStructure(SamilMsg msg)
             {
-                throw new NotImplementedException();
+                return From == msg.From && To == msg.To && Cmd == msg.Cmd;
             }
 
             internal bool CheckPayload(SamilMsg msg)
             {
-                throw new NotImplementedException();
+                return Payload.SequenceEqual(msg.Payload);
+            }
+        }
+
+        private static ushort WordAt(int pos, byte[] data)
+        {
+            if (BitConverter.IsLittleEndian)
+            {
+                return (ushort)(data[pos] << 8 + data[pos + 1]);
+            }
+            else
+            {
+                return BitConverter.ToUInt16(data, pos);
             }
         }
 
@@ -234,8 +281,15 @@ namespace Lucky.Home.Devices
             StartDataTimer();
         }
 
-        private async void PollData(HalfDuplexLineSink line)
+        private async void PollData()
         {
+            var line = Sinks.OfType<HalfDuplexLineSink>().FirstOrDefault();
+            if (line == null)
+            {
+                // disconnect
+                StartConnectionTimer();
+                return;
+            }
             var res = await CheckProtocolWRes(line, GetPvDataMessage, GetPvDataResponse, "get PV data", false);
             if (!res.Item1)
             {
@@ -243,8 +297,40 @@ namespace Lucky.Home.Devices
                 StartConnectionTimer();
                 return;
             }
-            // Decode data
-            var data = DecodeData(res.Item2);
+            // Decode and record data
+            if (!DecodePvData(res.Item2.Payload))
+            {
+                // Report invalid msg
+                ReportWarning("Invalid/strange PV data", res.Item2);
+            }
+        }
+
+        private bool DecodePvData(byte[] payload)
+        {
+            if (payload.Length != 48)
+            {
+                return false;
+            }
+            int panelVoltage = ExtractW(payload, 1);
+            int panelCurrent= ExtractW(payload, 2);
+            int mode = ExtractW(payload, 5);
+            int energyToday = ExtractW(payload, 6);
+            int gridCurrent = ExtractW(payload, 19);
+            int gridVoltage = ExtractW(payload, 20);
+            int gridFrequency = ExtractW(payload, 21);
+            int gridPower = ExtractW(payload, 22);
+            int totalPower = (ExtractW(payload, 23) << 16) + ExtractW(payload, 24);
+
+            return payload.All(b => b == 0);
+        }
+
+        private ushort ExtractW(byte[] payload, int pos)
+        {
+            pos *= 2;
+            var ret = WordAt(pos, payload);
+            payload[pos++] = 0;
+            payload[pos++] = 0;
+            return ret;
         }
 
         private void ReportFault(string reason, SamilMsg message)
