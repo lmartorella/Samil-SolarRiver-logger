@@ -52,16 +52,16 @@ namespace Lucky.Home.Devices
             {
                 From = from;
                 To = to;
-                Cmd = (ushort)(cmd << 8 + subcmd);
+                Cmd = (ushort)((cmd << 8) + subcmd);
                 Payload = payload ?? new byte[0];
 
-                _bytes = new List<byte>(11 + payload.Length);
+                _bytes = new List<byte>(11 + Payload.Length);
                 PushW(0x55AA);
                 PushW(From);
                 PushW(To);
                 PushW(Cmd);
-                _bytes.Add((byte)payload.Length);
-                _bytes.AddRange(payload);
+                _bytes.Add((byte)Payload.Length);
+                _bytes.AddRange(Payload);
                 PushW(_bytes.Aggregate((ushort)0, (b1, b2) => (ushort)(b1 + b2)));
             }
 
@@ -89,7 +89,7 @@ namespace Lucky.Home.Devices
                 return _bytes.ToArray();
             }
 
-            public static SamilMsg FromBytes(byte[] data)
+            public static SamilMsg FromBytes(byte[] data, byte[] payload = null)
             {
                 // Transform null in invalid message
                 if (data == null || data.Length < 11)
@@ -102,12 +102,12 @@ namespace Lucky.Home.Devices
                 {
                     return Invalid;
                 }
-                return new SamilMsg(WordAt(2, data), WordAt(4, data), data[6], data[7], data.Skip(9).Take(l).ToArray());
+                return new SamilMsg(WordAt(2, data), WordAt(4, data), data[6], data[7], payload ?? data.Skip(9).Take(l).ToArray());
             }
 
-            internal SamilMsg Clone()
+            internal SamilMsg Clone(byte[] payload)
             {
-                return FromBytes(ToBytes());
+                return FromBytes(ToBytes(), payload);
             }
 
             public override string ToString()
@@ -130,7 +130,7 @@ namespace Lucky.Home.Devices
         {
             if (BitConverter.IsLittleEndian)
             {
-                return (ushort)(data[pos] << 8 + data[pos + 1]);
+                return (ushort)((data[pos] << 8) + data[pos + 1]);
             }
             else
             {
@@ -208,18 +208,19 @@ namespace Lucky.Home.Devices
         private async Task<Tuple<bool, SamilMsg>> CheckProtocolWRes(HalfDuplexLineSink line, SamilMsg request, SamilMsg expResponse, string phase, bool checkPayload)
         {
             // Broadcast hello message
-            var res = SamilMsg.FromBytes(await line.SendReceive(request.ToBytes()));
+            var rcvBytes = await line.SendReceive(request.ToBytes());
+            var res = SamilMsg.FromBytes(rcvBytes);
             // Check correct response
             if (!res.CheckStructure(expResponse))
             {
-                ReportFault("Unexpected " + phase, res);
+                ReportFault("Unexpected " + phase, rcvBytes != null ? string.Join(" ", rcvBytes.Select(b => b.ToString("x2"))) : "<null>");
                 return Tuple.Create<bool, SamilMsg>(false, null);
             }
             if (checkPayload && !res.CheckPayload(expResponse))
             {
                 ReportWarning("Strange payload " + phase, res);
             }
-            return Tuple.Create(false, res);
+            return Tuple.Create(true, res);
         }
 
         private async void LoginInverter(HalfDuplexLineSink line)
@@ -241,8 +242,7 @@ namespace Lucky.Home.Devices
             _logger.Log("Found", "ID", Encoding.ASCII.GetString(id));
 
             // Now try to login as address 1
-            var loginMsg = LoginMessage.Clone();
-            loginMsg.Payload = id.Concat(new byte[] { AddressToAllocate }).ToArray();
+            var loginMsg = LoginMessage.Clone(id.Concat(new byte[] { AddressToAllocate }).ToArray());
 
             if (!await CheckProtocol(line, loginMsg, LoginResponse, "login response", true))
             { 
@@ -307,7 +307,7 @@ namespace Lucky.Home.Devices
 
         private bool DecodePvData(byte[] payload)
         {
-            if (payload.Length != 48)
+            if (payload.Length != 50)
             {
                 return false;
             }
@@ -333,9 +333,9 @@ namespace Lucky.Home.Devices
             return ret;
         }
 
-        private void ReportFault(string reason, SamilMsg message)
+        private void ReportFault(string reason, string bytes)
         {
-            _logger.Log(reason, "Msg", message);
+            _logger.Log(reason, "Msg", bytes);
         }
 
         private void ReportWarning(string reason, SamilMsg message)
