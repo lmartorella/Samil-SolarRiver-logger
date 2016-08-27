@@ -1,5 +1,5 @@
-﻿using Lucky.Home.Db;
-using System;
+﻿using System;
+using Lucky.Home.Db;
 
 namespace Lucky.Home.Power
 {
@@ -7,15 +7,11 @@ namespace Lucky.Home.Power
     {
         public double PowerW;
 
-        public double CurrentA;
-
-        public double TensionV;
-
-        public string CsvHeader
+        public virtual string CsvHeader
         {
             get
             {
-                return "PowerW,CurrentA,TensionV";
+                return "PowerW";
             }
         }
 
@@ -23,9 +19,7 @@ namespace Lucky.Home.Power
         {
             return new PowerData
             {
-                PowerW = PowerW + t1.PowerW,
-                CurrentA = CurrentA + t1.CurrentA,
-                TensionV = TensionV + t1.TensionV,
+                PowerW = PowerW + t1.PowerW
             };
         }
 
@@ -33,9 +27,7 @@ namespace Lucky.Home.Power
         {
             return new PowerData
             {
-                PowerW = PowerW * d,
-                CurrentA = CurrentA * d,
-                TensionV = TensionV * d,
+                PowerW = PowerW * d
             };
         }
 
@@ -43,9 +35,7 @@ namespace Lucky.Home.Power
         {
             return new PowerData
             {
-                PowerW = PowerW / d,
-                CurrentA = CurrentA / d,
-                TensionV = TensionV / d,
+                PowerW = PowerW / d
             };
         }
 
@@ -55,9 +45,63 @@ namespace Lucky.Home.Power
             return PowerW.CompareTo(other.PowerW);
         }
 
-        public string ToCsv()
+        public virtual string ToCsv()
         {
-            return string.Format("{0:0},{1:0.00},{2:0.0}", PowerW, CurrentA, TensionV);
+            return string.Format("{0:0}", PowerW);
+        }
+    }
+
+    internal class SamilPowerData : PowerData, ISupportAverage<SamilPowerData>
+    {
+        public double PanelVoltageV;
+        public double PanelCurrentA;
+        public int Mode;
+        public double EnergyTodayW;
+        public double GridCurrentA;
+        public double GridVoltageV;
+        public double GridFrequencyHz;
+        public double TotalPowerKW;
+
+        public override string CsvHeader
+        {
+            get
+            {
+                return "PowerW,TotalPowerKW,Mode,EnergyTodayW,GridCurrentA,PanelCurrentA,GridVoltageV,PanelVoltageV,GridFrequencyHz";
+            }
+        }
+
+        public override string ToCsv()
+        {
+            return string.Format("{0:0},{1:0},{2:0},{3:0},{4:0.00},{5:0.00},{6:0.0},{7:0.0},{8:0.00}", PowerW, TotalPowerKW, Mode, EnergyTodayW, GridCurrentA, PanelCurrentA, GridVoltageV, PanelVoltageV, GridFrequencyHz);
+        }
+
+        SamilPowerData ISupportAverage<SamilPowerData>.Add(SamilPowerData t1)
+        {
+            return new SamilPowerData
+            {
+                PowerW = PowerW + t1.PowerW
+            };
+        }
+
+        SamilPowerData ISupportAverage<SamilPowerData>.Mul(double d)
+        {
+            return new SamilPowerData
+            {
+                PowerW = PowerW * d
+            };
+        }
+
+        SamilPowerData ISupportAverage<SamilPowerData>.Div(double d)
+        {
+            return new SamilPowerData
+            {
+                PowerW = PowerW / d
+            };
+        }
+
+        int IComparable<SamilPowerData>.CompareTo(SamilPowerData other)
+        {
+            return base.CompareTo(other);
         }
     }
 }

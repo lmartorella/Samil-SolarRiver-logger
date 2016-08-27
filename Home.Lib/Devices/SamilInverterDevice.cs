@@ -25,6 +25,7 @@ namespace Lucky.Home.Devices
 
         private static readonly SamilMsg BroadcastRequest = new SamilMsg(0, 0, 0, 0);
         private static readonly SamilMsg BroadcastResponse = new SamilMsg(0, 0, 0, 0x80);
+        private static readonly byte[] UnknownResponse1Data = new byte[] { 0x00, 0x01, 0x04, 0x09, 0x0a, 0x0c, 0x11, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21, 0x22, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36 };
 
         private static readonly SamilMsg LoginMessage = new SamilMsg(0, 0, 0, 1);
         private static readonly SamilMsg LoginResponse = new SamilMsg(AddressToAllocate, 0, 0, 0x81, new byte[] { 0x6 });
@@ -40,8 +41,6 @@ namespace Lucky.Home.Devices
         private static readonly SamilMsg GetFwVersionResponse = new SamilMsg(AddressToAllocate, 0, 1, 0x83);
         private static readonly SamilMsg GetConfInfoMessage = new SamilMsg(0, AddressToAllocate, 1, 4);
         private static readonly SamilMsg GetConfInfoResponse = new SamilMsg(AddressToAllocate, 0, 1, 0x84);
-
-        private static readonly byte[] UnknownResponse1Data = new byte[] { 0x00, 0x01, 0x04, 0x09, 0x0a, 0x0c, 0x11, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21, 0x22, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36 };
 
         private class SamilMsg
         {
@@ -112,7 +111,7 @@ namespace Lucky.Home.Devices
 
             public override string ToString()
             {
-                return string.Join(",", _bytes.Select(b => b.ToString()));
+                return string.Join(" ", _bytes.Select(b => b.ToString("x2")));
             }
 
             internal bool CheckStructure(SamilMsg msg)
@@ -175,8 +174,20 @@ namespace Lucky.Home.Devices
 
         public string Name { get; private set; }
 
-        public ITimeSeries<PowerData> Database { get; set; }
+        ITimeSeries<PowerData> ISolarPanelDevice.Database
+        {
+            get
+            {
+                return (ITimeSeries<PowerData>)Database;
+            }
+            set
+            {
+                Database = (ITimeSeries<SamilPowerData>)value;
+            }
+        }
 
+        public ITimeSeries<SamilPowerData> Database { get; set; }
+        
         public PowerData ImmediateData { get; private set; }
 
         private void CheckConnection()
@@ -311,8 +322,9 @@ namespace Lucky.Home.Devices
             {
                 return false;
             }
+
             int panelVoltage = ExtractW(payload, 1);
-            int panelCurrent= ExtractW(payload, 2);
+            int panelCurrent = ExtractW(payload, 2);
             int mode = ExtractW(payload, 5);
             int energyToday = ExtractW(payload, 6);
             int gridCurrent = ExtractW(payload, 19);
@@ -320,6 +332,24 @@ namespace Lucky.Home.Devices
             int gridFrequency = ExtractW(payload, 21);
             int gridPower = ExtractW(payload, 22);
             int totalPower = (ExtractW(payload, 23) << 16) + ExtractW(payload, 24);
+
+            var db = Database;
+            if (db != null)
+            {
+                var data = new SamilPowerData
+                {
+                    PowerW = gridPower,
+                    PanelVoltageV = panelVoltage / 10.0,
+                    GridVoltageV = gridVoltage / 10.0,
+                    PanelCurrentA = panelCurrent / 10.0,
+                    GridCurrentA = gridCurrent / 10.0,
+                    Mode = mode,
+                    EnergyTodayW = energyToday * 10.0,
+                    GridFrequencyHz = gridFrequency / 100.0,
+                    TotalPowerKW = totalPower / 10.0
+                };
+                db.AddNewSample(data, DateTime.Now);
+            }
 
             return payload.All(b => b == 0);
         }
