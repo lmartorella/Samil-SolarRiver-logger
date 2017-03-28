@@ -32,7 +32,7 @@ namespace Lucky.HomeMock.Sinks
                     _state = State.Logout;
                     break;
 
-                case "55 aa 00 00 00 00 00 00 00 00 ff":
+                case "55 aa 00 00 00 00 00 00 00 00 ff":  // broadcast
                     if (_state == State.Logout)
                     {
                         // Only respond if logged out
@@ -40,7 +40,7 @@ namespace Lucky.HomeMock.Sinks
                     }
                     break;
 
-                case "55 aa 00 00 00 00 00 01 0b 41 53 35 31 34 42 58 30 33 39 01 03 70":
+                case "55 aa 00 00 00 00 00 01 0b 41 53 35 31 34 42 58 30 33 39 01 03 70": // login
                     if (_state == State.Logout)
                     {
                         _state = State.Login;
