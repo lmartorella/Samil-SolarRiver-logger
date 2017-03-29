@@ -37,7 +37,6 @@ namespace Lucky.Home.Devices
         protected class SamilMsg
         {
             private List<byte> _bytes;
-            private static readonly SamilMsg Invalid = new SamilMsg(0xFFFF, 0xFFFF, 0xFF, 0xFF);
 
             public SamilMsg(ushort from, ushort to, byte cmd, byte subcmd, byte[] payload = null)
             {
@@ -85,13 +84,13 @@ namespace Lucky.Home.Devices
                 // Transform null in invalid message
                 if (data == null || data.Length < 11)
                 {
-                    return Invalid;
+                    return null;
                 }
                 var checksum = data.Take(data.Length - 2).Aggregate((ushort)0, (b1, b2) => (ushort)(b1 + b2));
                 int l = data[8];
                 if (WordAt(0, data) != 0x55aa || WordAt(data.Length - 2, data) != checksum || l != data.Length - 11)
                 {
-                    return Invalid;
+                    return null;
                 }
                 return new SamilMsg(WordAt(2, data), WordAt(4, data), data[6], data[7], payload ?? data.Skip(9).Take(l).ToArray());
             }
@@ -103,7 +102,7 @@ namespace Lucky.Home.Devices
 
             public override string ToString()
             {
-                return string.Join(" ", _bytes.Select(b => b.ToString("x2")));
+                return _bytes.ToString();
             }
 
             internal bool CheckStructure(SamilMsg msg)
@@ -114,6 +113,18 @@ namespace Lucky.Home.Devices
             internal bool CheckPayload(SamilMsg msg)
             {
                 return Payload.SequenceEqual(msg.Payload);
+            }
+        }
+
+        protected static string ToString(byte[] bytes)
+        {
+            if (bytes.Length == 0)
+            {
+                return "<nodata>";
+            }
+            else
+            {
+                return string.Join(" ", bytes.Select(b => b.ToString("x2")));
             }
         }
 
@@ -137,22 +148,32 @@ namespace Lucky.Home.Devices
             _logger = Manager.GetService<LoggerFactory>().Create("Samil_" + Name);
         }
 
-        protected async Task<Tuple<bool, SamilMsg>> CheckProtocolWRes(HalfDuplexLineSink line, SamilMsg request, SamilMsg expResponse, Action<string> reportFault, Action<SamilMsg> reportWarning = null)
+        protected async Task<SamilMsg> CheckProtocolWRes(HalfDuplexLineSink line, SamilMsg request, SamilMsg expResponse, Action<byte[], SamilMsg> reportFault, Action<SamilMsg> reportWarning = null)
         {
             // Broadcast hello message
             var rcvBytes = await line.SendReceive(request.ToBytes());
             var res = SamilMsg.FromBytes(rcvBytes);
             // Check correct response
-            if (!res.CheckStructure(expResponse))
+            if (res == null && expResponse != null)
             {
-                reportFault(rcvBytes != null ? string.Join(" ", rcvBytes.Select(b => b.ToString("x2"))) : "<null>");
-                return Tuple.Create<bool, SamilMsg>(false, null);
+                reportFault(rcvBytes, null);
+                return null;
+            }
+            if (res != null && expResponse == null)
+            {
+                reportFault(rcvBytes, res);
+                return null;
+            }
+            if (res != null && expResponse != null && !res.CheckStructure(expResponse))
+            {
+                reportFault(rcvBytes, res);
+                return null;
             }
             if (reportWarning != null && !res.CheckPayload(expResponse))
             {
                 reportWarning(res);
             }
-            return Tuple.Create(true, res);
+            return res;
         }
     }
 }

@@ -30,32 +30,38 @@ namespace Lucky.Home.Devices
                         {
                             resp = await Exec(samilSink, req, expResp);
                         };
-                        var cmd = cmdSink.ReadCommand();
+                        var cmd = cmdSink.ReadCommand()?.ToLower();
                         switch (cmd)
                         {
-                            case "Broadcast":
+                            case "broadcast":
                                 exec(BroadcastRequest, BroadcastResponse);
                                 break;
-                            case "Login":
+                            case "login":
                                 exec(LoginMessage, LoginResponse);
                                 break;
-                            case "Logout":
+                            case "logout":
                                 exec(LogoutMessage, null);
                                 break;
-                            case "Unknown1":
+                            case "unknown1":
                                 exec(UnknownMessage1, UnknownResponse1);
                                 break;
-                            case "Unknown2":
+                            case "unknown2":
                                 exec(UnknownMessage2, UnknownResponse2);
                                 break;
-                            case "GetPvData":
+                            case "getpvdata":
                                 exec(GetPvDataMessage, GetPvDataResponse);
                                 break;
-                            case "GetFwVersion":
+                            case "getfwversion":
                                 exec(GetFwVersionMessage, GetFwVersionResponse);
                                 break;
-                            case "GetConfInfo":
+                            case "getconfinfo":
                                 exec(GetConfInfoMessage, GetConfInfoResponse);
+                                break;
+                            case null:
+                            case "":
+                                break;
+                            default:
+                                resp = "Unknown command";
                                 break;
                         }
                         if (resp != null)
@@ -70,10 +76,10 @@ namespace Lucky.Home.Devices
         private async Task<string> Exec(HalfDuplexLineSink sink, SamilMsg request, SamilMsg expResponse)
         {
             string err = null;
-            var resp = await CheckProtocolWRes(sink, request, expResponse, e => err = "ERR: " + e + ", exp " + expResponse.ToString());
-            if (err == null)
+            var resp = await CheckProtocolWRes(sink, request, expResponse, (data, msg) => err = "ERR: rcvd " + ToString(data));
+            if (resp != null)
             {
-                err = "OK: " + string.Join(" ", resp.Item2.Payload.Select(b => b.ToString("x2")));
+                err = "OK: " + ToString(resp.Payload);
             }
             return err;
         }

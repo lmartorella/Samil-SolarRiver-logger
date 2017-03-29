@@ -94,7 +94,7 @@ namespace Lucky.Home.Devices
         private async Task<bool> CheckProtocol(HalfDuplexLineSink line, SamilMsg request, SamilMsg expResponse, string phase, bool checkPayload)
         {
             Action<SamilMsg> warn = checkPayload ? (Action<SamilMsg>)(w => ReportWarning("Strange payload " + phase, w)) : null;
-            return (await CheckProtocolWRes(line, request, expResponse, fault => ReportFault("Unexpected " + phase, fault), warn)).Item1;
+            return (await CheckProtocolWRes(line, request, expResponse, (bytes, msg) => ReportFault("Unexpected " + phase, bytes, msg), warn)) != null;
         }
 
         private async void LoginInverter(HalfDuplexLineSink line)
@@ -104,15 +104,15 @@ namespace Lucky.Home.Devices
             {
                 await line.SendReceive(LogoutMessage.ToBytes());
             }
-            var res = await CheckProtocolWRes(line, BroadcastRequest, BroadcastResponse, fault => ReportFault("Unexpected broadcast response", fault));
-            if (!res.Item1)
+            var res = await CheckProtocolWRes(line, BroadcastRequest, BroadcastResponse, (bytes, msg) => ReportFault("Unexpected broadcast response", bytes, msg));
+            if (res == null)
             {
                 // Still continue to try login
                 return;
             }
 
             // Correct response!
-            var id = res.Item2.Payload;
+            var id = res.Payload;
             _logger.Log("Found", "ID", Encoding.ASCII.GetString(id));
 
             // Now try to login as address 1
@@ -164,18 +164,18 @@ namespace Lucky.Home.Devices
                 StartConnectionTimer();
                 return;
             }
-            var res = await CheckProtocolWRes(line, GetPvDataMessage, GetPvDataResponse, fault => ReportFault("Unexpected PV data", fault));
-            if (!res.Item1)
+            var res = await CheckProtocolWRes(line, GetPvDataMessage, GetPvDataResponse, (bytes, msg) => ReportFault("Unexpected PV data", bytes, msg));
+            if (res == null)
             {
                 // Relogin!
                 StartConnectionTimer();
                 return;
             }
             // Decode and record data
-            if (!DecodePvData(res.Item2.Payload))
+            if (!DecodePvData(res.Payload))
             {
                 // Report invalid msg
-                ReportWarning("Invalid/strange PV data", res.Item2);
+                ReportWarning("Invalid/strange PV data", res);
             }
         }
 
@@ -226,14 +226,21 @@ namespace Lucky.Home.Devices
             return ret;
         }
 
-        private void ReportFault(string reason, string bytes)
+        private void ReportFault(string reason, byte[] msg, SamilMsg message)
         {
-            _logger.Log(reason, "Msg", bytes);
+            if (message != null)
+            {
+                _logger.Log(reason, "Msg", message.ToString());
+            }
+            else
+            {
+                _logger.Log(reason, "Rcv", ToString(msg));
+            }
         }
 
         private void ReportWarning(string reason, SamilMsg message)
         {
-            _logger.Log(reason, "Msg", message);
+            _logger.Log(reason, "Warn. Msg", message.ToString());
         }
     }
 }
