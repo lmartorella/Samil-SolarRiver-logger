@@ -151,7 +151,7 @@ namespace Lucky.Home.Devices
         protected async Task<SamilMsg> CheckProtocolWRes(HalfDuplexLineSink line, SamilMsg request, SamilMsg expResponse, Action<byte[], SamilMsg> reportFault, Action<SamilMsg> reportWarning = null)
         {
             // Broadcast hello message
-            var rcvBytes = await line.SendReceive(request.ToBytes());
+            var rcvBytes = (await line.SendReceive(request.ToBytes())) ?? new byte[0];
             var res = SamilMsg.FromBytes(rcvBytes);
             // Check correct response
             if (res == null && expResponse != null)
