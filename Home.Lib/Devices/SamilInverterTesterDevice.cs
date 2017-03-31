@@ -1,6 +1,7 @@
 ﻿using Lucky.Home.Sinks;
 using System;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -12,11 +13,13 @@ namespace Lucky.Home.Devices
     class SamilInverterTesterDevice : SamilInverterDeviceBase
     {
         private Timer _timer;
+        private string _autocmd;
+        private DateTime _lastautocmd;
 
         public SamilInverterTesterDevice()
             :base("TESTER")
         {
-            _timer = new Timer(o => 
+            _timer = new Timer(async o => 
             {
                 if (IsFullOnline)
                 {
@@ -31,6 +34,26 @@ namespace Lucky.Home.Devices
                             resp = await Exec(samilSink, req, expResp);
                         };
                         var cmd = cmdSink.ReadCommand()?.ToLower();
+
+                        bool echo = false;
+
+                        if (cmd != null && cmd.Length > 1 && cmd[0] == '^')
+                        {
+                            cmd = _autocmd = cmd.Substring(1);
+                            _lastautocmd = DateTime.Now;
+                        }
+                        if (cmd == "" && _lastautocmd != null && DateTime.Now > (_lastautocmd + TimeSpan.FromSeconds(3)))
+                        {
+                            cmd = _autocmd;
+                            _lastautocmd = DateTime.Now;
+                        }
+
+                        if (cmd != null && cmd.Length > 1 && cmd[0] == '*')
+                        {
+                            echo = true;
+                            cmd = cmd.Substring(1);
+                        }
+
                         switch (cmd)
                         {
                             case "broadcast":
@@ -56,6 +79,18 @@ namespace Lucky.Home.Devices
                                 break;
                             case "getconfinfo":
                                 exec(GetConfInfoMessage, GetConfInfoResponse);
+                                break;
+                            case "mini":
+                                resp = ToString(await samilSink.SendReceive(new byte[] { 0x1, 0xaa }, echo) ?? new byte[0]);
+                                break;
+                            case "zero":
+                                resp = ToString(await samilSink.SendReceive(new byte[] { 0 }, echo) ?? new byte[0]);
+                                break;
+                            case "ascii":
+                                resp = ToString(await samilSink.SendReceive(new byte[] { 0x2, 0x40, 0x41 }, echo) ?? new byte[0]);
+                                break;
+                            case "long":
+                                resp = ToString(await samilSink.SendReceive(Encoding.ASCII.GetBytes("0123456789abcdefghijklmnopqrstuwxyz$"), echo) ?? new byte[0]);
                                 break;
                             case null:
                             case "":
