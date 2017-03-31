@@ -57,12 +57,20 @@ namespace SerialEcho
 
         private void SendResponse()
         {
-            // Invert rx/tx
-            Swap(2, 4);
-            Swap(3, 5);
-            _string[7] += 0x80;
-            var l = _string[8];
-            WordAt(l + 9, (ushort)(WordAt(l + 9) + 0x80));
+            if (_string[0] == 0x55)
+            {
+                // Invert rx/tx
+                Swap(2, 4);
+                Swap(3, 5);
+                _string[7] += 0x80;
+                var l = _string[8];
+                WordAt(l + 9, (ushort)(WordAt(l + 9) + 0x80));
+            }
+            else
+            {
+                // Don't send the size back
+                _string.RemoveAt(0);
+            }
 
             Console.WriteLine("{0}  TX <- {1}", TimeStamp, string.Join(" ", _string.Select(b => b.ToString("X2"))));
             _port.Write(_string.ToArray(), 0, _string.Count);
@@ -89,8 +97,19 @@ namespace SerialEcho
 
         private bool CheckString()
         {
-            if (_string.Count < 2)
+            if (_string.Count < 1)
             {
+                return false;
+            }
+            if (_string[0] != 0x55)
+            {
+                // Non-solar data. Length
+                if (_string.Count >= _string[0] + 1)
+                {
+                    // Ok complete string
+                    Console.WriteLine("{1} RX  -> {0}", string.Join(" ", _string.Select(b => b.ToString("X2"))), TimeStamp);
+                    return true;
+                }
                 return false;
             }
             if (_string[0] != 0x55 && _string[1] != 0xaa)
