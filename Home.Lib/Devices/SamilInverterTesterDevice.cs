@@ -19,7 +19,7 @@ namespace Lucky.Home.Devices
         public SamilInverterTesterDevice()
             :base("TESTER")
         {
-            _timer = new Timer(async o => 
+            _timer = new Timer(o => 
             {
                 if (IsFullOnline)
                 {
@@ -29,9 +29,9 @@ namespace Lucky.Home.Devices
                     if (cmdSink != null && samilSink != null)
                     {
                         string resp = null;
-                        Action<SamilMsg, SamilMsg> exec = async (req, expResp) =>
+                        Action<SamilMsg, SamilMsg> exec = (req, expResp) =>
                         {
-                            resp = await Exec(samilSink, req, expResp);
+                            resp = Exec(samilSink, req, expResp);
                         };
                         var cmd = cmdSink.ReadCommand()?.ToLower();
 
@@ -81,16 +81,16 @@ namespace Lucky.Home.Devices
                                 exec(GetConfInfoMessage, GetConfInfoResponse);
                                 break;
                             case "mini":
-                                resp = ToString(await samilSink.SendReceive(new byte[] { 0x1, 0xaa }, echo) ?? new byte[0]);
+                                resp = ToString(samilSink.SendReceive(new byte[] { 0x1, 0xaa }, echo) ?? new byte[0]);
                                 break;
                             case "zero":
-                                resp = ToString(await samilSink.SendReceive(new byte[] { 0 }, echo) ?? new byte[0]);
+                                resp = ToString(samilSink.SendReceive(new byte[] { 0 }, echo) ?? new byte[0]);
                                 break;
                             case "ascii":
-                                resp = ToString(await samilSink.SendReceive(new byte[] { 0x2, 0x40, 0x41 }, echo) ?? new byte[0]);
+                                resp = ToString(samilSink.SendReceive(new byte[] { 0x2, 0x40, 0x41 }, echo) ?? new byte[0]);
                                 break;
                             case "long":
-                                resp = ToString(await samilSink.SendReceive(Encoding.ASCII.GetBytes("0123456789abcdefghijklmnopqrstuwxyz$"), echo) ?? new byte[0]);
+                                resp = ToString(samilSink.SendReceive(Encoding.ASCII.GetBytes("0123456789abcdefghijklmnopqrstuwxyz$"), echo) ?? new byte[0]);
                                 break;
                             case null:
                             case "":
@@ -108,10 +108,10 @@ namespace Lucky.Home.Devices
             }, null, 0, 500);
         }
 
-        private async Task<string> Exec(HalfDuplexLineSink sink, SamilMsg request, SamilMsg expResponse)
+        private string Exec(HalfDuplexLineSink sink, SamilMsg request, SamilMsg expResponse)
         {
             string err = null;
-            var resp = await CheckProtocolWRes(sink, request, expResponse, (data, msg) => err = "ERR: rcvd " + ToString(data));
+            var resp = CheckProtocolWRes(sink, request, expResponse, (data, msg) => err = "ERR: rcvd " + ToString(data));
             if (resp != null)
             {
                 err = "OK: " + ToString(resp.Payload);

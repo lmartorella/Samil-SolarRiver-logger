@@ -91,20 +91,20 @@ namespace Lucky.Home.Devices
             }
         }
 
-        private async Task<bool> CheckProtocol(HalfDuplexLineSink line, SamilMsg request, SamilMsg expResponse, string phase, bool checkPayload)
+        private bool CheckProtocol(HalfDuplexLineSink line, SamilMsg request, SamilMsg expResponse, string phase, bool checkPayload)
         {
             Action<SamilMsg> warn = checkPayload ? (Action<SamilMsg>)(w => ReportWarning("Strange payload " + phase, w)) : null;
-            return (await CheckProtocolWRes(line, request, expResponse, (bytes, msg) => ReportFault("Unexpected " + phase, bytes, msg), warn)) != null;
+            return (CheckProtocolWRes(line, request, expResponse, (bytes, msg) => ReportFault("Unexpected " + phase, bytes, msg), warn)) != null;
         }
 
-        private async void LoginInverter(HalfDuplexLineSink line)
+        private void LoginInverter(HalfDuplexLineSink line)
         {
             // Send 3 logout messages
             for (int i = 0; i < 3; i++)
             {
-                await line.SendReceive(LogoutMessage.ToBytes());
+                line.SendReceive(LogoutMessage.ToBytes());
             }
-            var res = await CheckProtocolWRes(line, BroadcastRequest, BroadcastResponse, (bytes, msg) => ReportFault("Unexpected broadcast response", bytes, msg));
+            var res = CheckProtocolWRes(line, BroadcastRequest, BroadcastResponse, (bytes, msg) => ReportFault("Unexpected broadcast response", bytes, msg));
             if (res == null)
             {
                 // Still continue to try login
@@ -118,7 +118,7 @@ namespace Lucky.Home.Devices
             // Now try to login as address 1
             var loginMsg = LoginMessage.Clone(id.Concat(new byte[] { AddressToAllocate }).ToArray());
 
-            if (!await CheckProtocol(line, loginMsg, LoginResponse, "login response", true))
+            if (!CheckProtocol(line, loginMsg, LoginResponse, "login response", true))
             {
                 // Still continue to try login
                 return;
@@ -126,25 +126,25 @@ namespace Lucky.Home.Devices
 
             // Now I'm logged in!
             // Go with msg 1
-            if (!await CheckProtocol(line, UnknownMessage1, UnknownResponse1, "unknown message 1", true))
+            if (!CheckProtocol(line, UnknownMessage1, UnknownResponse1, "unknown message 1", true))
             {
                 // Still continue to try login
                 return;
             }
             // Go with msg 2
-            if (!await CheckProtocol(line, UnknownMessage2, UnknownResponse2, "unknown message 2", true))
+            if (!CheckProtocol(line, UnknownMessage2, UnknownResponse2, "unknown message 2", true))
             {
                 // Still continue to try login
                 return;
             }
             // Go with get firmware
-            if (!await CheckProtocol(line, GetFwVersionMessage, GetFwVersionResponse, "get firmware response", false))
+            if (!CheckProtocol(line, GetFwVersionMessage, GetFwVersionResponse, "get firmware response", false))
             {
                 // Still continue to try login
                 return;
             }
             // Go with get conf info
-            if (!await CheckProtocol(line, GetConfInfoMessage, GetConfInfoResponse, "get configuration", true))
+            if (!CheckProtocol(line, GetConfInfoMessage, GetConfInfoResponse, "get configuration", true))
             {
                 // Still continue to try login
                 return;
@@ -155,7 +155,7 @@ namespace Lucky.Home.Devices
             StartDataTimer();
         }
 
-        private async void PollData()
+        private void PollData()
         {
             var line = Sinks.OfType<HalfDuplexLineSink>().FirstOrDefault();
             if (line == null)
@@ -164,7 +164,7 @@ namespace Lucky.Home.Devices
                 StartConnectionTimer();
                 return;
             }
-            var res = await CheckProtocolWRes(line, GetPvDataMessage, GetPvDataResponse, (bytes, msg) => ReportFault("Unexpected PV data", bytes, msg));
+            var res = CheckProtocolWRes(line, GetPvDataMessage, GetPvDataResponse, (bytes, msg) => ReportFault("Unexpected PV data", bytes, msg));
             if (res == null)
             {
                 // Relogin!
