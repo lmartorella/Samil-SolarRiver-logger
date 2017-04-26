@@ -29,13 +29,13 @@ namespace Lucky.Home.Devices
                     if (cmdSink != null && samilSink != null)
                     {
                         string resp = null;
+                        bool echo = false;
+
                         Action<SamilMsg, SamilMsg> exec = (req, expResp) =>
                         {
-                            resp = Exec(samilSink, req, expResp);
+                            resp = Exec(samilSink, req, expResp, echo);
                         };
                         var cmd = cmdSink.ReadCommand()?.ToLower();
-
-                        bool echo = false;
 
                         if (cmd != null && cmd.Length > 1 && cmd[0] == '^')
                         {
@@ -108,10 +108,10 @@ namespace Lucky.Home.Devices
             }, null, 0, 500);
         }
 
-        private string Exec(HalfDuplexLineSink sink, SamilMsg request, SamilMsg expResponse)
+        private string Exec(HalfDuplexLineSink sink, SamilMsg request, SamilMsg expResponse, bool echo)
         {
             string err = null;
-            var resp = CheckProtocolWRes(sink, request, expResponse, (data, msg) => err = "ERR: rcvd " + ToString(data));
+            var resp = CheckProtocolWRes(sink, request, expResponse, (data, msg) => err = "ERR: rcvd " + ToString(data), null, echo);
             if (resp != null)
             {
                 err = "OK: " + ToString(resp.Payload);
