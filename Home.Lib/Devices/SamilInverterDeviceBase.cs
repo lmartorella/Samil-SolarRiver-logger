@@ -156,10 +156,10 @@ namespace Lucky.Home.Devices
             _logger = Manager.GetService<LoggerFactory>().Create("Samil_" + Name);
         }
 
-        protected SamilMsg CheckProtocolWRes(HalfDuplexLineSink line, SamilMsg request, SamilMsg expResponse, Action<byte[], SamilMsg> reportFault, Action<SamilMsg> reportWarning = null, bool echo = false)
+        protected SamilMsg CheckProtocolWRes(HalfDuplexLineSink line, string opName, SamilMsg request, SamilMsg expResponse, Action<byte[], SamilMsg> reportFault, Action<SamilMsg> reportWarning = null, bool echo = false)
         {
             // Broadcast hello message
-            var rcvBytes = (line.SendReceive(request.ToBytes(), echo)) ?? new byte[0];
+            var rcvBytes = (line.SendReceive(request.ToBytes(), echo, opName)) ?? new byte[0];
             var res = SamilMsg.FromBytes(rcvBytes);
             // Check correct response
             if (res == null && expResponse != null)

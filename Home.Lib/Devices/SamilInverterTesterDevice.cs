@@ -31,11 +31,11 @@ namespace Lucky.Home.Devices
                         string resp = null;
                         bool echo = false;
 
+                        var cmd = cmdSink.ReadCommand()?.ToLower();
                         Action<SamilMsg, SamilMsg> exec = (req, expResp) =>
                         {
-                            resp = Exec(samilSink, req, expResp, echo);
+                            resp = Exec(samilSink, cmd, req, expResp, echo);
                         };
-                        var cmd = cmdSink.ReadCommand()?.ToLower();
 
                         int secs;
                         if (cmd != null && cmd.Length > 2 && cmd[0] == '^' && int.TryParse(cmd.Substring(1, 1), out secs))
@@ -58,14 +58,23 @@ namespace Lucky.Home.Devices
 
                         switch (cmd)
                         {
-                            case "broadcast":
+                            case "auth":
                                 // 3 logout first
-                                resp = "3 logout + broadcast: ";
+                                resp = "auth flow: S";
                                 for (int i = 0; i < 3; i++)
                                 {
-                                    resp += Exec(samilSink, LogoutMessage, null, echo);
+                                    resp += ", logout:" + Exec(samilSink, "logout", LogoutMessage, null, echo);
+                                    Thread.Sleep(250);
                                 }
-                                resp += Exec(samilSink, BroadcastRequest, BroadcastResponse, echo);
+                                resp += ", bcast:" + Exec(samilSink, "bcast", BroadcastRequest, BroadcastResponse, echo);
+                                Thread.Sleep(250);
+
+                                byte[] id = new byte[] { 0x41, 0x53, 0x35, 0x31, 0x34, 0x42, 0x58, 0x30, 0x33, 0x39 };
+                                var loginMsg = LoginMessage.Clone(id.Concat(new byte[] { AddressToAllocate }).ToArray());
+                                resp += ", login:" + Exec(samilSink, "login", loginMsg, LoginResponse, echo);
+                                break;
+                            case "broadcast":
+                                exec(BroadcastRequest, BroadcastResponse);
                                 break;
                             case "login":
                                 exec(LoginMessage, LoginResponse);
@@ -89,16 +98,16 @@ namespace Lucky.Home.Devices
                                 exec(GetConfInfoMessage, GetConfInfoResponse);
                                 break;
                             case "mini":
-                                resp = ToString(samilSink.SendReceive(new byte[] { 0x1, 0xaa }, echo) ?? new byte[0]);
+                                resp = ToString(samilSink.SendReceive(new byte[] { 0x1, 0xaa }, echo, cmd) ?? new byte[0]);
                                 break;
                             case "zero":
-                                resp = ToString(samilSink.SendReceive(new byte[] { 0 }, echo) ?? new byte[0]);
+                                resp = ToString(samilSink.SendReceive(new byte[] { 0 }, echo, cmd) ?? new byte[0]);
                                 break;
                             case "ascii":
-                                resp = ToString(samilSink.SendReceive(new byte[] { 0x2, 0x40, 0x41 }, echo) ?? new byte[0]);
+                                resp = ToString(samilSink.SendReceive(new byte[] { 0x2, 0x40, 0x41 }, echo, cmd) ?? new byte[0]);
                                 break;
                             case "long":
-                                resp = ToString(samilSink.SendReceive(Encoding.ASCII.GetBytes("0123456789abcdefghijklmnopqrstuwxyz$"), echo) ?? new byte[0]);
+                                resp = ToString(samilSink.SendReceive(Encoding.ASCII.GetBytes("0123456789abcdefghijklmnopqrstuwxyz$"), echo, cmd) ?? new byte[0]);
                                 break;
                             case null:
                             case "":
@@ -116,10 +125,10 @@ namespace Lucky.Home.Devices
             }, null, 0, 500);
         }
 
-        private string Exec(HalfDuplexLineSink sink, SamilMsg request, SamilMsg expResponse, bool echo)
+        private string Exec(HalfDuplexLineSink sink, string opName, SamilMsg request, SamilMsg expResponse, bool echo)
         {
             string err = null;
-            var resp = CheckProtocolWRes(sink, request, expResponse, (data, msg) => err = "ERR: rcvd " + ToString(data), null, echo);
+            var resp = CheckProtocolWRes(sink, opName, request, expResponse, (data, msg) => err = "ERR: rcvd " + ToString(data), null, echo);
             if (resp != null)
             {
                 err = "OK: " + ToString(resp.Payload);

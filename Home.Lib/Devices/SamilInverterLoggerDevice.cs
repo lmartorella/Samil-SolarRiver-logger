@@ -17,7 +17,7 @@ namespace Lucky.Home.Devices
         private bool _noSink;
 
         private static readonly TimeSpan CheckConnectionPeriod = TimeSpan.FromSeconds(10);
-        private static readonly TimeSpan PollDataPeriod = TimeSpan.FromSeconds(5);
+        private static readonly TimeSpan PollDataPeriod = TimeSpan.FromSeconds(15);
 
         public SamilInverterLoggerDevice()
             : base("SAMIL")
@@ -93,7 +93,7 @@ namespace Lucky.Home.Devices
         private bool CheckProtocol(HalfDuplexLineSink line, SamilMsg request, SamilMsg expResponse, string phase, bool checkPayload)
         {
             Action<SamilMsg> warn = checkPayload ? (Action<SamilMsg>)(w => ReportWarning("Strange payload " + phase, w)) : null;
-            return (CheckProtocolWRes(line, request, expResponse, (bytes, msg) => ReportFault("Unexpected " + phase, bytes, msg), warn)) != null;
+            return (CheckProtocolWRes(line, phase, request, expResponse, (bytes, msg) => ReportFault("Unexpected " + phase, bytes, msg), warn)) != null;
         }
 
         private void LoginInverter(HalfDuplexLineSink line)
@@ -101,9 +101,10 @@ namespace Lucky.Home.Devices
             // Send 3 logout messages
             for (int i = 0; i < 3; i++)
             {
-                line.SendReceive(LogoutMessage.ToBytes());
+                line.SendReceive(LogoutMessage.ToBytes(), false, "logout");
+                Thread.Sleep(500);
             }
-            var res = CheckProtocolWRes(line, BroadcastRequest, BroadcastResponse, (bytes, msg) => ReportFault("Unexpected broadcast response", bytes, msg));
+            var res = CheckProtocolWRes(line, "bcast", BroadcastRequest, BroadcastResponse, (bytes, msg) => ReportFault("Unexpected broadcast response", bytes, msg));
             if (res == null)
             {
                 // Still continue to try login
@@ -163,7 +164,7 @@ namespace Lucky.Home.Devices
                 StartConnectionTimer();
                 return;
             }
-            var res = CheckProtocolWRes(line, GetPvDataMessage, GetPvDataResponse, (bytes, msg) => ReportFault("Unexpected PV data", bytes, msg));
+            var res = CheckProtocolWRes(line, "pv", GetPvDataMessage, GetPvDataResponse, (bytes, msg) => ReportFault("Unexpected PV data", bytes, msg));
             if (res == null)
             {
                 // Relogin!
