@@ -86,9 +86,17 @@ namespace Lucky.Home.Devices
                 {
                     return null;
                 }
-                var checksum = data.Take(data.Length - 2).Aggregate((ushort)0, (b1, b2) => (ushort)(b1 + b2));
+                // Check size and truncate the sampling
                 int l = data[8];
-                if (WordAt(0, data) != 0x55aa || WordAt(data.Length - 2, data) != checksum || l != data.Length - 11)
+                // So the correct data size should be 
+                int dataLength = l + 9 + 2;
+                if (data.Length < dataLength)
+                {
+                    // Truncated
+                    return null;
+                }
+                var checksum = data.Take(dataLength - 2).Aggregate((ushort)0, (b1, b2) => (ushort)(b1 + b2));
+                if (WordAt(0, data) != 0x55aa || WordAt(dataLength - 2, data) != checksum)
                 {
                     return null;
                 }

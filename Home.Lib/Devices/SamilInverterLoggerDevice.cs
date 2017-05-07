@@ -6,7 +6,6 @@ using System;
 using System.Linq;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace Lucky.Home.Devices
 {
@@ -20,8 +19,8 @@ namespace Lucky.Home.Devices
         private static readonly TimeSpan CheckConnectionPeriod = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan PollDataPeriod = TimeSpan.FromSeconds(5);
 
-        public SamilInverterLoggerDevice(string name)
-            : base(name)
+        public SamilInverterLoggerDevice()
+            : base("SAMIL")
         {
             StartConnectionTimer();
         }

@@ -3,11 +3,10 @@ using System;
 using System.Linq;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace Lucky.Home.Devices
 {
-    [Device("Samil Tester Logger")]
+    [Device("Samil Tester Message")]
     [Requires(typeof(HalfDuplexLineSink))]
     [Requires(typeof(MockCommandSink))]
     class SamilInverterTesterDevice : SamilInverterDeviceBase
@@ -15,6 +14,7 @@ namespace Lucky.Home.Devices
         private Timer _timer;
         private string _autocmd;
         private DateTime _lastautocmd;
+        private TimeSpan _autocmdPeriod;
 
         public SamilInverterTesterDevice()
             :base("TESTER")
@@ -37,12 +37,14 @@ namespace Lucky.Home.Devices
                         };
                         var cmd = cmdSink.ReadCommand()?.ToLower();
 
-                        if (cmd != null && cmd.Length > 1 && cmd[0] == '^')
+                        int secs;
+                        if (cmd != null && cmd.Length > 2 && cmd[0] == '^' && int.TryParse(cmd.Substring(1, 1), out secs))
                         {
-                            cmd = _autocmd = cmd.Substring(1);
+                            cmd = _autocmd = cmd.Substring(2);
                             _lastautocmd = DateTime.Now;
+                            _autocmdPeriod = TimeSpan.FromSeconds(secs);
                         }
-                        if (cmd == "" && _lastautocmd != null && DateTime.Now > (_lastautocmd + TimeSpan.FromSeconds(3)))
+                        if (cmd == "" && _lastautocmd != null && DateTime.Now > (_lastautocmd + _autocmdPeriod))
                         {
                             cmd = _autocmd;
                             _lastautocmd = DateTime.Now;
@@ -57,7 +59,13 @@ namespace Lucky.Home.Devices
                         switch (cmd)
                         {
                             case "broadcast":
-                                exec(BroadcastRequest, BroadcastResponse);
+                                // 3 logout first
+                                resp = "3 logout + broadcast: ";
+                                for (int i = 0; i < 3; i++)
+                                {
+                                    resp += Exec(samilSink, LogoutMessage, null, echo);
+                                }
+                                resp += Exec(samilSink, BroadcastRequest, BroadcastResponse, echo);
                                 break;
                             case "login":
                                 exec(LoginMessage, LoginResponse);
