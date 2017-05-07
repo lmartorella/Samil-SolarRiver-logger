@@ -15,8 +15,27 @@ namespace Lucky.Home.Devices
     {
         private Timer _timer;
         private bool _noSink;
+        private bool _inNightMode = false;
+        private DateTime _lastValidData = DateTime.Now;
 
-        private static readonly TimeSpan CheckConnectionPeriod = TimeSpan.FromSeconds(10);
+        /// <summary>
+        /// After this time of no samples, enter night mode
+        /// </summary>
+        private static readonly TimeSpan EnterNightModeAfter = TimeSpan.FromMinutes(2);
+
+        /// <summary>
+        /// During day (e.g. when samples are working), retry every 10 seconds
+        /// </summary>
+        private static readonly TimeSpan CheckConnectionPeriodDay = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// During noght (e.g. when last sample is older that 2 minutes), retry every 2 minutes
+        /// </summary>
+        private static readonly TimeSpan CheckConnectionPeriodNight = TimeSpan.FromMinutes(2);
+
+        /// <summary>
+        /// Get a solar PV sample every 15 seconds
+        /// </summary>
         private static readonly TimeSpan PollDataPeriod = TimeSpan.FromSeconds(15);
 
         public SamilInverterLoggerDevice()
@@ -32,11 +51,11 @@ namespace Lucky.Home.Devices
                 _timer.Dispose();
             }
 
-            // Poll SAMIL each 5 secs
+            // Poll SAMIL for login
             _timer = new Timer(o =>
             {
                 CheckConnection();
-            }, null, TimeSpan.Zero, CheckConnectionPeriod);
+            }, null, TimeSpan.FromSeconds(1), InNightMode ? CheckConnectionPeriodNight : CheckConnectionPeriodDay);
         }
 
         private void StartDataTimer()
@@ -46,11 +65,11 @@ namespace Lucky.Home.Devices
                 _timer.Dispose();
             }
 
-            // Poll SAMIL each 5 secs
+            // Poll SAMIL for data
             _timer = new Timer(o =>
             {
                 PollData();
-            }, null, TimeSpan.Zero, PollDataPeriod);
+            }, null, TimeSpan.FromSeconds(1), PollDataPeriod);
         }
 
         ITimeSeries<PowerData> ISolarPanelDevice.Database
@@ -85,8 +104,38 @@ namespace Lucky.Home.Devices
             }
             else
             {
-                _noSink = false;
-                LoginInverter(line);
+                if (_noSink)
+                {
+                    _logger.Log("Sink OK");
+                    _noSink = false;
+                }
+                if (!LoginInverter(line))
+                {
+                    if (DateTime.Now - _lastValidData > EnterNightModeAfter)
+                    {
+                        InNightMode = true;
+                    }
+                }
+            }
+        }
+
+        private bool InNightMode
+        {
+            get
+            {
+                return _inNightMode;
+            }
+            set
+            {
+                if (_inNightMode != value)
+                {
+                    _inNightMode = value;
+                    _logger.Log("NightMode: " + value);
+                    if (value)
+                    {
+                        StartConnectionTimer();
+                    }
+                }
             }
         }
 
@@ -96,7 +145,7 @@ namespace Lucky.Home.Devices
             return (CheckProtocolWRes(line, phase, request, expResponse, (bytes, msg) => ReportFault("Unexpected " + phase, bytes, msg), warn)) != null;
         }
 
-        private void LoginInverter(HalfDuplexLineSink line)
+        private bool LoginInverter(HalfDuplexLineSink line)
         {
             // Send 3 logout messages
             for (int i = 0; i < 3; i++)
@@ -108,7 +157,7 @@ namespace Lucky.Home.Devices
             if (res == null)
             {
                 // Still continue to try login
-                return;
+                return false;
             }
 
             // Correct response!
@@ -121,7 +170,7 @@ namespace Lucky.Home.Devices
             if (!CheckProtocol(line, loginMsg, LoginResponse, "login response", true))
             {
                 // Still continue to try login
-                return;
+                return false;
             }
 
             // Now I'm logged in!
@@ -129,30 +178,32 @@ namespace Lucky.Home.Devices
             if (!CheckProtocol(line, UnknownMessage1, UnknownResponse1, "unknown message 1", true))
             {
                 // Still continue to try login
-                return;
+                return false;
             }
             // Go with msg 2
             if (!CheckProtocol(line, UnknownMessage2, UnknownResponse2, "unknown message 2", true))
             {
                 // Still continue to try login
-                return;
+                return false;
             }
             // Go with get firmware
             if (!CheckProtocol(line, GetFwVersionMessage, GetFwVersionResponse, "get firmware response", false))
             {
                 // Still continue to try login
-                return;
+                return false;
             }
             // Go with get conf info
             if (!CheckProtocol(line, GetConfInfoMessage, GetConfInfoResponse, "get configuration", true))
             {
                 // Still continue to try login
-                return;
+                return false;
             }
 
             // OK!
             // Start data timer
+            InNightMode = false;
             StartDataTimer();
+            return true;
         }
 
         private void PollData()
@@ -176,6 +227,11 @@ namespace Lucky.Home.Devices
             {
                 // Report invalid msg
                 ReportWarning("Invalid/strange PV data", res);
+            }
+            else
+            {
+                // Store last timestamp
+                _lastValidData = DateTime.Now;
             }
         }
 
