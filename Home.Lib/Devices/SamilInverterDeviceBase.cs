@@ -2,7 +2,6 @@
 using System.Linq;
 using Lucky.Services;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using Lucky.Home.Sinks;
 
 namespace Lucky.Home.Devices
@@ -110,7 +109,7 @@ namespace Lucky.Home.Devices
 
             public override string ToString()
             {
-                return _bytes.ToString();
+                return SamilInverterDeviceBase.ToString(_bytes.ToArray());
             }
 
             internal bool CheckStructure(SamilMsg msg)

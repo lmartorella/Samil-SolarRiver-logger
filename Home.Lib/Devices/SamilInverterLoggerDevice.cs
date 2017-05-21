@@ -24,6 +24,11 @@ namespace Lucky.Home.Devices
         private static readonly TimeSpan EnterNightModeAfter = TimeSpan.FromMinutes(2);
 
         /// <summary>
+        /// After this time after an error, reconnect
+        /// </summary>
+        private static readonly TimeSpan CheckConnectionFirstTimeout = TimeSpan.FromSeconds(5);
+
+        /// <summary>
         /// During day (e.g. when samples are working), retry every 10 seconds
         /// </summary>
         private static readonly TimeSpan CheckConnectionPeriodDay = TimeSpan.FromSeconds(10);
@@ -55,7 +60,7 @@ namespace Lucky.Home.Devices
             _timer = new Timer(o =>
             {
                 CheckConnection();
-            }, null, TimeSpan.FromSeconds(1), InNightMode ? CheckConnectionPeriodNight : CheckConnectionPeriodDay);
+            }, null, CheckConnectionFirstTimeout, InNightMode ? CheckConnectionPeriodNight : CheckConnectionPeriodDay);
         }
 
         private void StartDataTimer()
@@ -153,7 +158,13 @@ namespace Lucky.Home.Devices
                 line.SendReceive(LogoutMessage.ToBytes(), false, "logout");
                 Thread.Sleep(500);
             }
-            var res = CheckProtocolWRes(line, "bcast", BroadcastRequest, BroadcastResponse, (bytes, msg) => ReportFault("Unexpected broadcast response", bytes, msg));
+            var res = CheckProtocolWRes(line, "bcast", BroadcastRequest, BroadcastResponse, (bytes, msg) =>
+                {
+                    if (!InNightMode)
+                    {
+                        ReportFault("Unexpected broadcast response", bytes, msg);
+                    }
+                });
             if (res == null)
             {
                 // Still continue to try login
@@ -296,7 +307,7 @@ namespace Lucky.Home.Devices
 
         private void ReportWarning(string reason, SamilMsg message)
         {
-            _logger.Log(reason, "Warn. Msg", message.ToString());
+            _logger.Log(reason, "Warn. Payload:", ToString(message.Payload));
         }
     }
 }
