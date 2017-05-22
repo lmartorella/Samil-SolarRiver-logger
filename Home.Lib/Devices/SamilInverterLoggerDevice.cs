@@ -147,22 +147,23 @@ namespace Lucky.Home.Devices
         private bool CheckProtocol(HalfDuplexLineSink line, SamilMsg request, SamilMsg expResponse, string phase, bool checkPayload)
         {
             Action<SamilMsg> warn = checkPayload ? (Action<SamilMsg>)(w => ReportWarning("Strange payload " + phase, w)) : null;
-            return (CheckProtocolWRes(line, phase, request, expResponse, (bytes, msg) => ReportFault("Unexpected " + phase, bytes, msg), warn)) != null;
+            return (CheckProtocolWRes(line, phase, request, expResponse, (err, bytes, msg) => ReportFault("Unexpected " + phase, bytes, msg, err), warn)) != null;
         }
 
         private bool LoginInverter(HalfDuplexLineSink line)
         {
+            HalfDuplexLineSink.Error err;
             // Send 3 logout messages
             for (int i = 0; i < 3; i++)
             {
-                line.SendReceive(LogoutMessage.ToBytes(), false, "logout");
+                line.SendReceive(LogoutMessage.ToBytes(), false, false, "logout", out err);
                 Thread.Sleep(500);
             }
-            var res = CheckProtocolWRes(line, "bcast", BroadcastRequest, BroadcastResponse, (bytes, msg) =>
+            var res = CheckProtocolWRes(line, "bcast", BroadcastRequest, BroadcastResponse, (er, bytes, msg) =>
                 {
                     if (!InNightMode)
                     {
-                        ReportFault("Unexpected broadcast response", bytes, msg);
+                        ReportFault("Unexpected broadcast response", bytes, msg, er);
                     }
                 });
             if (res == null)
@@ -197,18 +198,18 @@ namespace Lucky.Home.Devices
                 // Still continue to try login
                 return false;
             }
-            // Go with get firmware
-            if (!CheckProtocol(line, GetFwVersionMessage, GetFwVersionResponse, "get firmware response", false))
-            {
-                // Still continue to try login
-                return false;
-            }
-            // Go with get conf info
-            if (!CheckProtocol(line, GetConfInfoMessage, GetConfInfoResponse, "get configuration", true))
-            {
-                // Still continue to try login
-                return false;
-            }
+            //// Go with get firmware
+            //if (!CheckProtocol(line, GetFwVersionMessage, GetFwVersionResponse, "get firmware response", false))
+            //{
+            //    // Still continue to try login
+            //    return false;
+            //}
+            //// Go with get conf info
+            //if (!CheckProtocol(line, GetConfInfoMessage, GetConfInfoResponse, "get configuration", true))
+            //{
+            //    // Still continue to try login
+            //    return false;
+            //}
 
             // OK!
             // Start data timer
@@ -226,7 +227,7 @@ namespace Lucky.Home.Devices
                 StartConnectionTimer();
                 return;
             }
-            var res = CheckProtocolWRes(line, "pv", GetPvDataMessage, GetPvDataResponse, (bytes, msg) => ReportFault("Unexpected PV data", bytes, msg));
+            var res = CheckProtocolWRes(line, "pv", GetPvDataMessage, GetPvDataResponse, (err, bytes, msg) => ReportFault("Unexpected PV data", bytes, msg, err));
             if (res == null)
             {
                 // Relogin!
@@ -293,9 +294,13 @@ namespace Lucky.Home.Devices
             return ret;
         }
 
-        private void ReportFault(string reason, byte[] msg, SamilMsg message)
+        private void ReportFault(string reason, byte[] msg, SamilMsg message, HalfDuplexLineSink.Error err)
         {
-            if (message != null)
+            if (err != HalfDuplexLineSink.Error.Ok)
+            {
+                _logger.Log(reason, "Err", err);
+            }
+            else if (message != null)
             {
                 _logger.Log(reason, "Msg", message.ToString());
             }

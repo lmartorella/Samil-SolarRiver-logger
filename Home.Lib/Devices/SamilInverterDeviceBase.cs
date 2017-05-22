@@ -155,25 +155,32 @@ namespace Lucky.Home.Devices
             _logger = Manager.GetService<LoggerFactory>().Create("Samil_" + Name);
         }
 
-        protected SamilMsg CheckProtocolWRes(HalfDuplexLineSink line, string opName, SamilMsg request, SamilMsg expResponse, Action<byte[], SamilMsg> reportFault, Action<SamilMsg> reportWarning = null, bool echo = false)
+        protected SamilMsg CheckProtocolWRes(HalfDuplexLineSink line, string opName, SamilMsg request, SamilMsg expResponse, Action<HalfDuplexLineSink.Error, byte[], SamilMsg> reportFault, Action<SamilMsg> reportWarning = null, bool echo = false)
         {
+            HalfDuplexLineSink.Error err;
             // Broadcast hello message
-            var rcvBytes = (line.SendReceive(request.ToBytes(), echo, opName)) ?? new byte[0];
+            var rcvBytes = (line.SendReceive(request.ToBytes(), true, echo, opName, out err)) ?? new byte[0];
+            if (err != HalfDuplexLineSink.Error.Ok)
+            {
+                reportFault(err, rcvBytes, null);
+                return null;
+            }
+
             var res = SamilMsg.FromBytes(rcvBytes);
             // Check correct response
             if (res == null && expResponse != null)
             {
-                reportFault(rcvBytes, null);
+                reportFault(err, rcvBytes, null);
                 return null;
             }
             if (res != null && expResponse == null)
             {
-                reportFault(rcvBytes, res);
+                reportFault(err, rcvBytes, res);
                 return null;
             }
             if (res != null && expResponse != null && !res.CheckStructure(expResponse))
             {
-                reportFault(rcvBytes, res);
+                reportFault(err, rcvBytes, res);
                 return null;
             }
             if (reportWarning != null && !res.CheckPayload(expResponse))

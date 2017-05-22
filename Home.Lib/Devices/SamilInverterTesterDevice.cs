@@ -56,6 +56,7 @@ namespace Lucky.Home.Devices
                             cmd = cmd.Substring(1);
                         }
 
+                        HalfDuplexLineSink.Error err;
                         switch (cmd)
                         {
                             case "auth":
@@ -98,16 +99,16 @@ namespace Lucky.Home.Devices
                                 exec(GetConfInfoMessage, GetConfInfoResponse);
                                 break;
                             case "mini":
-                                resp = ToString(samilSink.SendReceive(new byte[] { 0x1, 0xaa }, echo, cmd) ?? new byte[0]);
+                                resp = ToString(samilSink.SendReceive(new byte[] { 0x1, 0xaa }, true, echo, cmd, out err) ?? new byte[0]);
                                 break;
                             case "zero":
-                                resp = ToString(samilSink.SendReceive(new byte[] { 0 }, echo, cmd) ?? new byte[0]);
+                                resp = ToString(samilSink.SendReceive(new byte[] { 0 }, true, echo, cmd, out err) ?? new byte[0]);
                                 break;
                             case "ascii":
-                                resp = ToString(samilSink.SendReceive(new byte[] { 0x2, 0x40, 0x41 }, echo, cmd) ?? new byte[0]);
+                                resp = ToString(samilSink.SendReceive(new byte[] { 0x2, 0x40, 0x41 }, true, echo, cmd, out err) ?? new byte[0]);
                                 break;
                             case "long":
-                                resp = ToString(samilSink.SendReceive(Encoding.ASCII.GetBytes("0123456789abcdefghijklmnopqrstuwxyz$"), echo, cmd) ?? new byte[0]);
+                                resp = ToString(samilSink.SendReceive(Encoding.ASCII.GetBytes("0123456789abcdefghijklmnopqrstuwxyz$"), true, echo, cmd, out err) ?? new byte[0]);
                                 break;
                             case null:
                             case "":
@@ -128,7 +129,17 @@ namespace Lucky.Home.Devices
         private string Exec(HalfDuplexLineSink sink, string opName, SamilMsg request, SamilMsg expResponse, bool echo)
         {
             string err = null;
-            var resp = CheckProtocolWRes(sink, opName, request, expResponse, (data, msg) => err = "ERR: rcvd " + ToString(data), null, echo);
+            var resp = CheckProtocolWRes(sink, opName, request, expResponse, (er, data, msg) => 
+                {
+                    if (er != HalfDuplexLineSink.Error.Ok)
+                    {
+                        err = "ERR: " + er;
+                    }
+                    else
+                    {
+                        err = "ERR: rcvd " + ToString(data);
+                    }
+                }, null, echo);
             if (resp != null)
             {
                 err = "OK: " + ToString(resp.Payload);

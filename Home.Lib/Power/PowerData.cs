@@ -66,7 +66,7 @@ namespace Lucky.Home.Power
         {
             get
             {
-                return "PowerW,TotalPowerKW,Mode,EnergyTodayW,GridCurrentA,PanelCurrentA,GridVoltageV,PanelVoltageV,GridFrequencyHz";
+                return "PowerW,TotalEnergyKWh,Mode,EnergyTodayWh,GridCurrentA,PanelCurrentA,GridVoltageV,PanelVoltageV,GridFrequencyHz";
             }
         }
 
