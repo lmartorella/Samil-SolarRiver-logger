@@ -179,6 +179,7 @@ namespace Lucky.Home.Devices
             // Now try to login as address 1
             var loginMsg = LoginMessage.Clone(id.Concat(new byte[] { AddressToAllocate }).ToArray());
 
+            Thread.Sleep(500);
             if (!CheckProtocol(line, loginMsg, LoginResponse, "login response", true))
             {
                 // Still continue to try login
@@ -187,29 +188,33 @@ namespace Lucky.Home.Devices
 
             // Now I'm logged in!
             // Go with msg 1
+            Thread.Sleep(500);
             if (!CheckProtocol(line, UnknownMessage1, UnknownResponse1, "unknown message 1", true))
             {
                 // Still continue to try login
                 return false;
             }
             // Go with msg 2
+            Thread.Sleep(500);
             if (!CheckProtocol(line, UnknownMessage2, UnknownResponse2, "unknown message 2", true))
             {
                 // Still continue to try login
                 return false;
             }
-            //// Go with get firmware
-            //if (!CheckProtocol(line, GetFwVersionMessage, GetFwVersionResponse, "get firmware response", false))
-            //{
-            //    // Still continue to try login
-            //    return false;
-            //}
-            //// Go with get conf info
-            //if (!CheckProtocol(line, GetConfInfoMessage, GetConfInfoResponse, "get configuration", true))
-            //{
-            //    // Still continue to try login
-            //    return false;
-            //}
+            // Go with get firmware
+            Thread.Sleep(500);
+            if (!CheckProtocol(line, GetFwVersionMessage, GetFwVersionResponse, "get firmware response", false))
+            {
+                // Still continue to try login
+                return false;
+            }
+            // Go with get conf info
+            Thread.Sleep(500);
+            if (!CheckProtocol(line, GetConfInfoMessage, GetConfInfoResponse, "get configuration", true))
+            {
+                // Still continue to try login
+                return false;
+            }
 
             // OK!
             // Start data timer
