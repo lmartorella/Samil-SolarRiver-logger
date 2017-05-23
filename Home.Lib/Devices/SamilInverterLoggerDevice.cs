@@ -201,20 +201,20 @@ namespace Lucky.Home.Devices
                 // Still continue to try login
                 return false;
             }
-            // Go with get firmware
-            Thread.Sleep(500);
-            if (!CheckProtocol(line, GetFwVersionMessage, GetFwVersionResponse, "get firmware response", false))
-            {
-                // Still continue to try login
-                return false;
-            }
-            // Go with get conf info
-            Thread.Sleep(500);
-            if (!CheckProtocol(line, GetConfInfoMessage, GetConfInfoResponse, "get configuration", true))
-            {
-                // Still continue to try login
-                return false;
-            }
+            //// Go with get firmware
+            //Thread.Sleep(500);
+            //if (!CheckProtocol(line, GetFwVersionMessage, GetFwVersionResponse, "get firmware response", false))
+            //{
+            //    // Still continue to try login
+            //    return false;
+            //}
+            //// Go with get conf info
+            //Thread.Sleep(500);
+            //if (!CheckProtocol(line, GetConfInfoMessage, GetConfInfoResponse, "get configuration", true))
+            //{
+            //    // Still continue to try login
+            //    return false;
+            //}
 
             // OK!
             // Start data timer
