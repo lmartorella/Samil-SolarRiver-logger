@@ -201,20 +201,20 @@ namespace Lucky.Home.Devices
                 // Still continue to try login
                 return false;
             }
-            //// Go with get firmware
-            //Thread.Sleep(500);
-            //if (!CheckProtocol(line, GetFwVersionMessage, GetFwVersionResponse, "get firmware response", false))
-            //{
-            //    // Still continue to try login
-            //    return false;
-            //}
-            //// Go with get conf info
-            //Thread.Sleep(500);
-            //if (!CheckProtocol(line, GetConfInfoMessage, GetConfInfoResponse, "get configuration", true))
-            //{
-            //    // Still continue to try login
-            //    return false;
-            //}
+            // Go with get firmware
+            Thread.Sleep(500);
+            if (!CheckProtocol(line, GetFwVersionMessage, GetFwVersionResponse, "get firmware response", false))
+            {
+                // Still continue to try login
+                return false;
+            }
+            // Go with get conf info
+            Thread.Sleep(500);
+            if (!CheckProtocol(line, GetConfInfoMessage, GetConfInfoResponse, "get configuration", true))
+            {
+                // Still continue to try login
+                return false;
+            }
 
             // OK!
             // Start data timer
@@ -263,6 +263,7 @@ namespace Lucky.Home.Devices
             int panelCurrent = ExtractW(payload, 2);
             int mode = ExtractW(payload, 5);
             int energyToday = ExtractW(payload, 6);
+            ushort fault = ExtractW(payload, 7);
             int gridCurrent = ExtractW(payload, 19);
             int gridVoltage = ExtractW(payload, 20);
             int gridFrequency = ExtractW(payload, 21);
@@ -280,6 +281,7 @@ namespace Lucky.Home.Devices
                     PanelCurrentA = panelCurrent / 10.0,
                     GridCurrentA = gridCurrent / 10.0,
                     Mode = mode,
+                    Fault = fault,
                     EnergyTodayW = energyToday * 10.0,
                     GridFrequencyHz = gridFrequency / 100.0,
                     TotalPowerKW = totalPower / 10.0

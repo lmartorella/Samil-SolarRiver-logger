@@ -55,24 +55,27 @@ namespace Lucky.Home.Power
     {
         public double PanelVoltageV;
         public double PanelCurrentA;
+        // Mode: 1: ON, 0: OFF, 2: Connecting?
         public int Mode;
         public double EnergyTodayW;
         public double GridCurrentA;
         public double GridVoltageV;
         public double GridFrequencyHz;
         public double TotalPowerKW;
+        // Bitwise? 0x800 = no grid power
+        public ushort Fault;
 
         public override string CsvHeader
         {
             get
             {
-                return "PowerW,TotalEnergyKWh,Mode,EnergyTodayWh,GridCurrentA,PanelCurrentA,GridVoltageV,PanelVoltageV,GridFrequencyHz";
+                return "PowerW,TotalEnergyKWh,Mode,EnergyTodayWh,GridCurrentA,PanelCurrentA,GridVoltageV,PanelVoltageV,GridFrequencyHz,Fault";
             }
         }
 
         public override string ToCsv()
         {
-            return string.Format("{0:0},{1:0},{2:0},{3:0},{4:0.00},{5:0.00},{6:0.0},{7:0.0},{8:0.00}", PowerW, TotalPowerKW, Mode, EnergyTodayW, GridCurrentA, PanelCurrentA, GridVoltageV, PanelVoltageV, GridFrequencyHz);
+            return string.Format("{0:0},{1:0},{2:0},{3:0},{4:0.00},{5:0.00},{6:0.0},{7:0.0},{8:0.00},{9:0}", PowerW, TotalPowerKW, Mode, EnergyTodayW, GridCurrentA, PanelCurrentA, GridVoltageV, PanelVoltageV, GridFrequencyHz, Fault);
         }
 
         SamilPowerData ISupportAverage<SamilPowerData>.Add(SamilPowerData t1)
