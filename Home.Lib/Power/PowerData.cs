@@ -55,7 +55,7 @@ namespace Lucky.Home.Power
     {
         public double PanelVoltageV;
         public double PanelCurrentA;
-        // Mode: 1: ON, 0: OFF, 2: Connecting?
+        // Mode: 1: ON, 0: OFF, 2: Fault
         public int Mode;
         public double EnergyTodayW;
         public double GridCurrentA;

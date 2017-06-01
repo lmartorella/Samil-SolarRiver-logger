@@ -1,4 +1,5 @@
 ﻿using Lucky.Home.Db;
+using Lucky.Home.Notification;
 using Lucky.Home.Power;
 using Lucky.Home.Sinks;
 using Lucky.Services;
@@ -42,6 +43,8 @@ namespace Lucky.Home.Devices
         /// Get a solar PV sample every 15 seconds
         /// </summary>
         private static readonly TimeSpan PollDataPeriod = TimeSpan.FromSeconds(15);
+
+        private ushort _lastFault = 0;
 
         public SamilInverterLoggerDevice()
             : base("SAMIL")
@@ -287,6 +290,8 @@ namespace Lucky.Home.Devices
                     TotalPowerKW = totalPower / 10.0
                 };
                 db.AddNewSample(data, DateTime.Now);
+
+                CheckFault(data.Fault);
             }
 
             return payload.All(b => b == 0);
@@ -320,6 +325,32 @@ namespace Lucky.Home.Devices
         private void ReportWarning(string reason, SamilMsg message)
         {
             _logger.Log(reason, "Warn. Payload:", ToString(message.Payload));
+        }
+
+        private void CheckFault(ushort fault)
+        {
+            if (_lastFault != fault)
+            {
+                _lastFault = fault;
+                var notification = Manager.GetService<INotificationService>();
+                if (fault != 0)
+                {
+                    notification.SendMail("Inverter fault", "Fault: " + ToFaultDescription(fault));
+                }
+                else
+                {
+                    notification.SendMail("(RESOLVED) Inverter fault", "");
+                }
+            }
+        }
+
+        private string ToFaultDescription(ushort fault)
+        {
+            switch (fault)
+            {
+                case 0x800: return "No grid connection";
+            }
+            return fault.ToString();
         }
     }
 }
