@@ -331,16 +331,16 @@ namespace Lucky.Home.Devices
         {
             if (_lastFault != fault)
             {
-                _lastFault = fault;
                 var notification = Manager.GetService<INotificationService>();
                 if (fault != 0)
                 {
-                    notification.SendMail("Inverter fault", "Fault: " + ToFaultDescription(fault));
+                    notification.SendMail("Inverter fault!", "Error: " + ToFaultDescription(fault));
                 }
                 else
                 {
-                    notification.SendMail("(RESOLVED) Inverter fault", "");
+                    notification.SendMail("Inverter OK", "Error " + ToFaultDescription(_lastFault) + " now resolved");
                 }
+                _lastFault = fault;
             }
         }
 
@@ -348,9 +348,12 @@ namespace Lucky.Home.Devices
         {
             switch (fault)
             {
-                case 0x800: return "No grid connection";
+                case 0x800:
+                    return "No grid connection";
+                case 0x2000:
+                    return "Grid frequency too high";
             }
-            return fault.ToString();
+            return "0x" + fault.ToString("X4");
         }
     }
 }
