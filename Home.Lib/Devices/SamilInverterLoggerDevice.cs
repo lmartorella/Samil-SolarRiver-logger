@@ -350,6 +350,8 @@ namespace Lucky.Home.Devices
             {
                 case 0x800:
                     return "No grid connection";
+                case 0x1000:
+                    return "Grid frequency too low";
                 case 0x2000:
                     return "Grid frequency too high";
             }
