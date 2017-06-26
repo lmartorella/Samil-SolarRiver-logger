@@ -45,6 +45,7 @@ namespace Lucky.Home.Devices
         private static readonly TimeSpan PollDataPeriod = TimeSpan.FromSeconds(15);
 
         private ushort _lastFault = 0;
+        private IStatusUpdate _lastFaultMessage;
 
         public SamilInverterLoggerDevice()
             : base("SAMIL")
@@ -332,13 +333,29 @@ namespace Lucky.Home.Devices
             if (_lastFault != fault)
             {
                 var notification = Manager.GetService<INotificationService>();
+                DateTime ts = DateTime.Now;
                 if (fault != 0)
                 {
-                    notification.SendMail("Inverter fault!", "Error: " + ToFaultDescription(fault));
+                    _lastFaultMessage = notification.EnqueueStatusUpdate("Errori Inverter", "Errore: " + ToFaultDescription(fault));
                 }
                 else
                 {
-                    notification.SendMail("Inverter OK", "Error " + ToFaultDescription(_lastFault) + " now resolved");
+                    // Try to recover last message update
+                    bool notify = true;
+                    if (_lastFaultMessage != null)
+                    {
+                        if (_lastFaultMessage.Update(() =>
+                        {
+                            _lastFaultMessage.Text += ", risolto dopo " + (int)(DateTime.Now - _lastFaultMessage.TimeStamp).TotalSeconds + " secondi.";
+                        }))
+                        {
+                            notify = false;
+                        }
+                    }
+                    if (notify)
+                    {
+                        notification.EnqueueStatusUpdate("Errori Inverter", "Normale");
+                    }
                 }
                 _lastFault = fault;
             }
