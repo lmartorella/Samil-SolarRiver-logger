@@ -12,6 +12,6 @@ namespace Lucky.Home.Devices
 
         PowerData ImmediateData { get; }
 
-        ITimeSeries<PowerData> Database { get; set; }
+        ITimeSeries<PowerData, DayPowerData> Database { get; set; }
     }
 }

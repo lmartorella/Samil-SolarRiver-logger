@@ -81,19 +81,7 @@ namespace Lucky.Home.Devices
             }, null, TimeSpan.FromSeconds(1), PollDataPeriod);
         }
 
-        ITimeSeries<PowerData> ISolarPanelDevice.Database
-        {
-            get
-            {
-                return (ITimeSeries<PowerData>)Database;
-            }
-            set
-            {
-                Database = (ITimeSeries<SamilPowerData>)value;
-            }
-        }
-
-        public ITimeSeries<SamilPowerData> Database { get; set; }
+        public ITimeSeries<PowerData, DayPowerData> Database { get; set; }
 
         public PowerData ImmediateData { get; private set; }
 
@@ -277,7 +265,7 @@ namespace Lucky.Home.Devices
             var db = Database;
             if (db != null)
             {
-                var data = new SamilPowerData
+                var data = new PowerData
                 {
                     PowerW = gridPower,
                     PanelVoltageV = panelVoltage / 10.0,
