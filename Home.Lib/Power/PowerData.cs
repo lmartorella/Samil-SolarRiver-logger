@@ -3,7 +3,7 @@ using Lucky.Home.Db;
 
 namespace Lucky.Home.Power
 {
-    class PowerData : ISupportAverage<PowerData>, ISupportCsv
+    class PowerData : IComparable<PowerData>, ISupportCsv
     {
         public double PowerW;
 
@@ -23,22 +23,6 @@ namespace Lucky.Home.Power
             };
         }
 
-        public PowerData Mul(double d)
-        {
-            return new PowerData
-            {
-                PowerW = PowerW * d
-            };
-        }
-
-        public PowerData Div(double d)
-        {
-            return new PowerData
-            {
-                PowerW = PowerW / d
-            };
-        }
-
         public int CompareTo(PowerData other)
         {
             // Only compare Power for peak analysis
@@ -51,7 +35,7 @@ namespace Lucky.Home.Power
         }
     }
 
-    internal class SamilPowerData : PowerData, ISupportAverage<SamilPowerData>
+    internal class SamilPowerData : PowerData, IComparable<SamilPowerData>
     {
         public double PanelVoltageV;
         public double PanelCurrentA;
@@ -76,30 +60,6 @@ namespace Lucky.Home.Power
         public override string ToCsv()
         {
             return string.Format("{0:0},{1:0},{2:0},{3:0},{4:0.00},{5:0.00},{6:0.0},{7:0.0},{8:0.00},{9:0}", PowerW, TotalPowerKW, Mode, EnergyTodayW, GridCurrentA, PanelCurrentA, GridVoltageV, PanelVoltageV, GridFrequencyHz, Fault);
-        }
-
-        SamilPowerData ISupportAverage<SamilPowerData>.Add(SamilPowerData t1)
-        {
-            return new SamilPowerData
-            {
-                PowerW = PowerW + t1.PowerW
-            };
-        }
-
-        SamilPowerData ISupportAverage<SamilPowerData>.Mul(double d)
-        {
-            return new SamilPowerData
-            {
-                PowerW = PowerW * d
-            };
-        }
-
-        SamilPowerData ISupportAverage<SamilPowerData>.Div(double d)
-        {
-            return new SamilPowerData
-            {
-                PowerW = PowerW / d
-            };
         }
 
         int IComparable<SamilPowerData>.CompareTo(SamilPowerData other)
