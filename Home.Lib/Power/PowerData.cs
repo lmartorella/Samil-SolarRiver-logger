@@ -3,7 +3,7 @@ using Lucky.Home.Db;
 
 namespace Lucky.Home.Power
 {
-    class PowerData : IComparable<PowerData>, ISupportCsv
+    class PowerData : ISupportCsv
     {
         public double PowerW;
 
@@ -15,27 +15,13 @@ namespace Lucky.Home.Power
             }
         }
 
-        public PowerData Add(PowerData t1)
-        {
-            return new PowerData
-            {
-                PowerW = PowerW + t1.PowerW
-            };
-        }
-
-        public int CompareTo(PowerData other)
-        {
-            // Only compare Power for peak analysis
-            return PowerW.CompareTo(other.PowerW);
-        }
-
         public virtual string ToCsv()
         {
             return string.Format("{0:0}", PowerW);
         }
     }
 
-    internal class SamilPowerData : PowerData, IComparable<SamilPowerData>
+    internal class SamilPowerData : PowerData
     {
         public double PanelVoltageV;
         public double PanelCurrentA;
@@ -60,11 +46,6 @@ namespace Lucky.Home.Power
         public override string ToCsv()
         {
             return string.Format("{0:0},{1:0},{2:0},{3:0},{4:0.00},{5:0.00},{6:0.0},{7:0.0},{8:0.00},{9:0}", PowerW, TotalPowerKW, Mode, EnergyTodayW, GridCurrentA, PanelCurrentA, GridVoltageV, PanelVoltageV, GridFrequencyHz, Fault);
-        }
-
-        int IComparable<SamilPowerData>.CompareTo(SamilPowerData other)
-        {
-            return base.CompareTo(other);
         }
     }
 }
