@@ -1,4 +1,4 @@
-﻿using Lucky.Home.Db;
+﻿using Lucky.Db;
 using Lucky.Home.Notification;
 using Lucky.Home.Power;
 using Lucky.Home.Sinks;
@@ -18,6 +18,7 @@ namespace Lucky.Home.Devices
         private bool _noSink;
         private bool _inNightMode = false;
         private DateTime _lastValidData = DateTime.Now;
+        private ITimeSeries<PowerData, DayPowerData> Database { get; set; }
 
         /// <summary>
         /// After this time of no samples, enter night mode
@@ -50,6 +51,11 @@ namespace Lucky.Home.Devices
         public SamilInverterLoggerDevice()
             : base("SAMIL")
         {
+        }
+
+        public void Init(ITimeSeries<PowerData, DayPowerData> database)
+        {
+            Database = database;
             StartConnectionTimer();
         }
 
@@ -80,8 +86,6 @@ namespace Lucky.Home.Devices
                 PollData();
             }, null, TimeSpan.FromSeconds(1), PollDataPeriod);
         }
-
-        public ITimeSeries<PowerData, DayPowerData> Database { get; set; }
 
         public PowerData ImmediateData { get; private set; }
 
@@ -267,6 +271,7 @@ namespace Lucky.Home.Devices
             {
                 var data = new PowerData
                 {
+                    TimeStamp = DateTime.Now,
                     PowerW = gridPower,
                     PanelVoltageV = panelVoltage / 10.0,
                     GridVoltageV = gridVoltage / 10.0,
@@ -274,11 +279,11 @@ namespace Lucky.Home.Devices
                     GridCurrentA = gridCurrent / 10.0,
                     Mode = mode,
                     Fault = fault,
-                    EnergyTodayW = energyToday * 10.0,
+                    EnergyTodayWh = energyToday * 10.0,
                     GridFrequencyHz = gridFrequency / 100.0,
-                    TotalPowerKW = totalPower / 10.0
+                    TotalEnergyKWh = totalPower / 10.0
                 };
-                db.AddNewSample(data, DateTime.Now);
+                db.AddNewSample(data);
 
                 CheckFault(data.Fault);
             }
