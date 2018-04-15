@@ -4,7 +4,9 @@ using Lucky.Home.Power;
 using Lucky.Home.Sinks;
 using Lucky.Services;
 using System;
+using System.IO;
 using System.Linq;
+using System.Net.Mime;
 using System.Text;
 using System.Threading;
 
@@ -101,7 +103,6 @@ namespace Lucky.Home.Devices
                     _logger.Log("NoSink");
                     _noSink = true;
                 }
-                return;
             }
             else
             {
@@ -134,7 +135,15 @@ namespace Lucky.Home.Devices
                     _logger.Log("NightMode: " + value);
                     if (value)
                     {
+                        // From day to night -> connect
                         StartConnectionTimer();
+
+                        // Send summary
+                        var summary = Database.GetAggregatedData();
+                        if (summary != null)
+                        {
+                            SendSummaryMail(summary);
+                        }
                     }
                 }
             }
@@ -366,6 +375,19 @@ namespace Lucky.Home.Devices
                     return "Grid frequency too high";
             }
             return "0x" + fault.ToString("X4");
+        }
+
+        private void SendSummaryMail(DayPowerData day)
+        {
+            var title = Resources.solar_daily_summary_title.Replace("{0}", day.PowerKWh.ToString("0.0"));
+            var body = Resources.solar_daily_summary.Replace("{0}", day.PowerKWh.ToString("0.00"));
+            //var chart = lastPeriod.ToChart().ToPng(250, 250);
+            var attachments = new Tuple<Stream, ContentType, string>[]
+            {
+                //Tuple.Create(chart, new ContentType("image/png"), "summary")
+            };
+            Manager.GetService<INotificationService>().SendHtmlMail(title, body, attachments);
+            Logger.Log("DailyMailSent", "Power", day.PowerKWh);
         }
     }
 }
