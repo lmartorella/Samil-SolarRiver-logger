@@ -19,6 +19,7 @@ namespace Lucky.Home.Devices
         private Timer _timer;
         private bool _noSink;
         private bool _inNightMode = false;
+        private bool _inNightModeSet = false;
         private DateTime _lastValidData = DateTime.Now;
         private ITimeSeries<PowerData, DayPowerData> Database { get; set; }
 
@@ -140,11 +141,12 @@ namespace Lucky.Home.Devices
 
                         // Send summary
                         var summary = Database.GetAggregatedData();
-                        if (summary != null)
+                        if (summary != null && !_inNightModeSet)
                         {
                             SendSummaryMail(summary);
                         }
                     }
+                    _inNightModeSet = true;
                 }
             }
         }
