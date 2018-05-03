@@ -141,7 +141,8 @@ namespace Lucky.Home.Devices
 
                         // Send summary
                         var summary = Database.GetAggregatedData();
-                        if (summary != null && !_inNightModeSet)
+                        // Skip the first migration from day to night at startup during night
+                        if (summary != null && _inNightModeSet)
                         {
                             SendSummaryMail(summary);
                         }
