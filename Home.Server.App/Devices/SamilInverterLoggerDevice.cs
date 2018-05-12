@@ -19,7 +19,7 @@ namespace Lucky.Home.Devices
         private Timer _timer;
         private bool _noSink;
         private bool _inNightMode = false;
-        private bool _inNightModeSet = false;
+        private bool _isSummarySent = true;
         private DateTime _lastValidData = DateTime.Now;
         private ITimeSeries<PowerData, DayPowerData> Database { get; set; }
 
@@ -142,12 +142,12 @@ namespace Lucky.Home.Devices
                         // Send summary
                         var summary = Database.GetAggregatedData();
                         // Skip the first migration from day to night at startup during night
-                        if (summary != null && _inNightModeSet)
+                        if (summary != null && !_isSummarySent)
                         {
                             SendSummaryMail(summary);
+                            _isSummarySent = true;
                         }
                     }
-                    _inNightModeSet = true;
                 }
             }
         }
@@ -296,6 +296,11 @@ namespace Lucky.Home.Devices
                     TotalEnergyKWh = totalPower / 10.0
                 };
                 db.AddNewSample(data);
+                if (gridPower > 0)
+                {
+                    // New data, unlock next mail
+                    _isSummarySent = false;
+                }
 
                 CheckFault(data.Fault);
             }
