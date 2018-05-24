@@ -3,6 +3,7 @@ using System;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Lucky.Home.Devices
 {
@@ -19,7 +20,7 @@ namespace Lucky.Home.Devices
         public SamilInverterTesterDevice()
             :base("TESTER")
         {
-            _timer = new Timer(o => 
+            _timer = new Timer(async o => 
             {
                 if (IsFullOnline)
                 {
@@ -31,10 +32,10 @@ namespace Lucky.Home.Devices
                         string resp = null;
                         bool echo = false;
 
-                        var cmd = cmdSink.ReadCommand()?.ToLower();
-                        Action<SamilMsg, SamilMsg> exec = (req, expResp) =>
+                        var cmd = (await cmdSink.ReadCommand())?.ToLower();
+                        Func<SamilMsg, SamilMsg, Task> exec = async (req, expResp) =>
                         {
-                            resp = Exec(samilSink, cmd, req, expResp, echo);
+                            resp = await Exec(samilSink, cmd, req, expResp, echo);
                         };
 
                         int secs;
@@ -56,7 +57,7 @@ namespace Lucky.Home.Devices
                             cmd = cmd.Substring(1);
                         }
 
-                        HalfDuplexLineSink.Error err;
+                        Tuple<byte[], HalfDuplexLineSink.Error> r;
                         switch (cmd)
                         {
                             case "auth":
@@ -75,40 +76,44 @@ namespace Lucky.Home.Devices
                                 resp += ", login:" + Exec(samilSink, "login", loginMsg, LoginResponse, echo);
                                 break;
                             case "broadcast":
-                                exec(BroadcastRequest, BroadcastResponse);
+                                await exec(BroadcastRequest, BroadcastResponse);
                                 break;
                             case "login":
-                                exec(LoginMessage, LoginResponse);
+                                await exec(LoginMessage, LoginResponse);
                                 break;
                             case "logout":
-                                exec(LogoutMessage, null);
+                                await exec(LogoutMessage, null);
                                 break;
                             case "unknown1":
-                                exec(UnknownMessage1, UnknownResponse1);
+                                await exec(UnknownMessage1, UnknownResponse1);
                                 break;
                             case "unknown2":
-                                exec(UnknownMessage2, UnknownResponse2);
+                                await exec(UnknownMessage2, UnknownResponse2);
                                 break;
                             case "getpvdata":
-                                exec(GetPvDataMessage, GetPvDataResponse);
+                                await exec(GetPvDataMessage, GetPvDataResponse);
                                 break;
                             case "getfwversion":
-                                exec(GetFwVersionMessage, GetFwVersionResponse);
+                                await exec(GetFwVersionMessage, GetFwVersionResponse);
                                 break;
                             case "getconfinfo":
-                                exec(GetConfInfoMessage, GetConfInfoResponse);
+                                await exec(GetConfInfoMessage, GetConfInfoResponse);
                                 break;
                             case "mini":
-                                resp = ToString(samilSink.SendReceive(new byte[] { 0x1, 0xaa }, true, echo, cmd, out err) ?? new byte[0]);
+                                r = await samilSink.SendReceive(new byte[] { 0x1, 0xaa }, true, echo, cmd);
+                                resp = ToString(r.Item1 ?? new byte[0]);
                                 break;
                             case "zero":
-                                resp = ToString(samilSink.SendReceive(new byte[] { 0 }, true, echo, cmd, out err) ?? new byte[0]);
+                                r = await samilSink.SendReceive(new byte[] { 0 }, true, echo, cmd);
+                                resp = ToString(r.Item1 ?? new byte[0]);
                                 break;
                             case "ascii":
-                                resp = ToString(samilSink.SendReceive(new byte[] { 0x2, 0x40, 0x41 }, true, echo, cmd, out err) ?? new byte[0]);
+                                r = await samilSink.SendReceive(new byte[] { 0x2, 0x40, 0x41 }, true, echo, cmd);
+                                resp = ToString(r.Item1 ?? new byte[0]);
                                 break;
                             case "long":
-                                resp = ToString(samilSink.SendReceive(Encoding.ASCII.GetBytes("0123456789abcdefghijklmnopqrstuwxyz$"), true, echo, cmd, out err) ?? new byte[0]);
+                                r = await samilSink.SendReceive(Encoding.ASCII.GetBytes("0123456789abcdefghijklmnopqrstuwxyz$"), true, echo, cmd);
+                                resp = ToString(r.Item1 ?? new byte[0]);
                                 break;
                             case null:
                             case "":
@@ -119,17 +124,17 @@ namespace Lucky.Home.Devices
                         }
                         if (resp != null)
                         {
-                            cmdSink.WriteResponse(resp);
+                            await cmdSink.WriteResponse(resp);
                         }
                     }
                 }
             }, null, 0, 500);
         }
 
-        private string Exec(HalfDuplexLineSink sink, string opName, SamilMsg request, SamilMsg expResponse, bool echo)
+        private async Task<string> Exec(HalfDuplexLineSink sink, string opName, SamilMsg request, SamilMsg expResponse, bool echo)
         {
             string err = null;
-            var resp = CheckProtocolWRes(sink, opName, request, expResponse, (er, data, msg) => 
+            var resp = await CheckProtocolWRes(sink, opName, request, expResponse, (er, data, msg) => 
                 {
                     if (er != HalfDuplexLineSink.Error.Ok)
                     {

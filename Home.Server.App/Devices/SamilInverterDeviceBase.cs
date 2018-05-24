@@ -3,6 +3,7 @@ using System.Linq;
 using Lucky.Services;
 using System.Collections.Generic;
 using Lucky.Home.Sinks;
+using System.Threading.Tasks;
 
 namespace Lucky.Home.Devices
 {
@@ -183,11 +184,12 @@ namespace Lucky.Home.Devices
             _logger = Manager.GetService<LoggerFactory>().Create("Samil_" + Name);
         }
 
-        protected SamilMsg CheckProtocolWRes(HalfDuplexLineSink line, string opName, SamilMsg request, SamilMsg expResponse, Action<HalfDuplexLineSink.Error, byte[], SamilMsg> reportFault, Action<SamilMsg> reportWarning = null, bool echo = false)
+        protected async Task<SamilMsg> CheckProtocolWRes(HalfDuplexLineSink line, string opName, SamilMsg request, SamilMsg expResponse, Action<HalfDuplexLineSink.Error, byte[], SamilMsg> reportFault, Action<SamilMsg> reportWarning = null, bool echo = false)
         {
-            HalfDuplexLineSink.Error err;
             // Broadcast hello message
-            var rcvBytes = (line.SendReceive(request.ToBytes(), true, echo, opName, out err)) ?? new byte[0];
+            var ret = await (line.SendReceive(request.ToBytes(), true, echo, opName));
+            var rcvBytes = ret.Item1 ?? new byte[0];
+            HalfDuplexLineSink.Error err = ret.Item2;
             if (err != HalfDuplexLineSink.Error.Ok)
             {
                 reportFault(err, rcvBytes, null);

@@ -9,6 +9,7 @@ using System.Linq;
 using System.Net.Mime;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Lucky.Home.Devices
 {
@@ -72,7 +73,9 @@ namespace Lucky.Home.Devices
             // Poll SAMIL for login
             _timer = new Timer(o =>
             {
+#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
                 CheckConnection();
+#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
             }, null, CheckConnectionFirstTimeout, InNightMode ? CheckConnectionPeriodNight : CheckConnectionPeriodDay);
         }
 
@@ -86,13 +89,15 @@ namespace Lucky.Home.Devices
             // Poll SAMIL for data
             _timer = new Timer(o =>
             {
+#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
                 PollData();
+#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
             }, null, TimeSpan.FromSeconds(1), PollDataPeriod);
         }
 
         public PowerData ImmediateData { get; private set; }
 
-        private void CheckConnection()
+        private async Task CheckConnection()
         {
             // Poll the line
             var line = Sinks.OfType<HalfDuplexLineSink>().FirstOrDefault();
@@ -112,7 +117,7 @@ namespace Lucky.Home.Devices
                     _logger.Log("Sink OK");
                     _noSink = false;
                 }
-                if (!LoginInverter(line))
+                if (!await LoginInverter(line))
                 {
                     if (DateTime.Now - _lastValidData > EnterNightModeAfter)
                     {
@@ -158,16 +163,17 @@ namespace Lucky.Home.Devices
             return (CheckProtocolWRes(line, phase, request, expResponse, (err, bytes, msg) => ReportFault("Unexpected " + phase, bytes, msg, err), warn)) != null;
         }
 
-        private bool LoginInverter(HalfDuplexLineSink line)
+        private async Task<bool> LoginInverter(HalfDuplexLineSink line)
         {
-            HalfDuplexLineSink.Error err;
             // Send 3 logout messages
             for (int i = 0; i < 3; i++)
             {
-                line.SendReceive(LogoutMessage.ToBytes(), false, false, "logout", out err);
-                Thread.Sleep(500);
+                var r = await line.SendReceive(LogoutMessage.ToBytes(), false, false, "logout");
+                // Ignore errors
+                await Task.Delay(500);
             }
-            var res = CheckProtocolWRes(line, "bcast", BroadcastRequest, BroadcastResponse, (er, bytes, msg) =>
+
+            var res = await CheckProtocolWRes(line, "bcast", BroadcastRequest, BroadcastResponse, (er, bytes, msg) =>
                 {
                     if (!InNightMode)
                     {
@@ -231,7 +237,7 @@ namespace Lucky.Home.Devices
             return true;
         }
 
-        private void PollData()
+        private async Task PollData()
         {
             var line = Sinks.OfType<HalfDuplexLineSink>().FirstOrDefault();
             if (line == null)
@@ -240,7 +246,7 @@ namespace Lucky.Home.Devices
                 StartConnectionTimer();
                 return;
             }
-            var res = CheckProtocolWRes(line, "pv", GetPvDataMessage, GetPvDataResponse, (err, bytes, msg) => ReportFault("Unexpected PV data", bytes, msg, err));
+            var res = await CheckProtocolWRes(line, "pv", GetPvDataMessage, GetPvDataResponse, (err, bytes, msg) => ReportFault("Unexpected PV data", bytes, msg, err));
             if (res == null)
             {
                 // Relogin!
