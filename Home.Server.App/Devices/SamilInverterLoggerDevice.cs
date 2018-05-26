@@ -17,7 +17,6 @@ namespace Lucky.Home.Devices
     [Requires(typeof(HalfDuplexLineSink))]
     class SamilInverterLoggerDevice : SamilInverterDeviceBase, ISolarPanelDevice
     {
-        private Timer _timer;
         private bool _noSink;
         private bool _inNightMode = false;
         private bool _isSummarySent = true;
@@ -28,11 +27,6 @@ namespace Lucky.Home.Devices
         /// After this time of no samples, enter night mode
         /// </summary>
         private static readonly TimeSpan EnterNightModeAfter = TimeSpan.FromMinutes(2);
-
-        /// <summary>
-        /// After this time after an error, reconnect
-        /// </summary>
-        private static readonly TimeSpan CheckConnectionFirstTimeout = TimeSpan.FromSeconds(5);
 
         /// <summary>
         /// During day (e.g. when samples are working), retry every 10 seconds
@@ -51,48 +45,43 @@ namespace Lucky.Home.Devices
 
         private ushort _lastFault = 0;
         private IStatusUpdate _lastFaultMessage;
+        private bool _inConnectionMode;
 
         public SamilInverterLoggerDevice()
             : base("SAMIL")
         {
         }
 
-        public void Init(ITimeSeries<PowerData, DayPowerData> database)
+        public async Task StartLoop(ITimeSeries<PowerData, DayPowerData> database)
         {
             Database = database;
-            StartConnectionTimer();
+            _inConnectionMode = true;
+
+            // Start wait loop
+            while (!IsDisposed)
+            {
+                if (_inConnectionMode)
+                {
+                    await Task.Delay(InNightMode ? CheckConnectionPeriodNight : CheckConnectionPeriodDay);
+                    await CheckConnection();
+                }
+                else
+                {
+                    // Poll SAMIL for data
+                    await Task.Delay(PollDataPeriod);
+                    await PollData();
+                }
+            }
         }
 
         private void StartConnectionTimer()
         {
-            if (_timer != null)
-            {
-                _timer.Dispose();
-            }
-
-            // Poll SAMIL for login
-            _timer = new Timer(o =>
-            {
-#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-                CheckConnection();
-#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-            }, null, CheckConnectionFirstTimeout, InNightMode ? CheckConnectionPeriodNight : CheckConnectionPeriodDay);
+            _inConnectionMode = true;
         }
 
         private void StartDataTimer()
         {
-            if (_timer != null)
-            {
-                _timer.Dispose();
-            }
-
-            // Poll SAMIL for data
-            _timer = new Timer(o =>
-            {
-#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-                PollData();
-#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-            }, null, TimeSpan.FromSeconds(1), PollDataPeriod);
+            _inConnectionMode = false;
         }
 
         public PowerData ImmediateData { get; private set; }

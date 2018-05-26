@@ -1,5 +1,6 @@
 ﻿using Lucky.Db;
 using Lucky.Home.Power;
+using System.Threading.Tasks;
 
 namespace Lucky.Home.Devices
 {
@@ -12,6 +13,6 @@ namespace Lucky.Home.Devices
 
         PowerData ImmediateData { get; }
 
-        void Init(ITimeSeries<PowerData, DayPowerData> database);
+        Task StartLoop(ITimeSeries<PowerData, DayPowerData> database);
     }
 }
