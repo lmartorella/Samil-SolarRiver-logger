@@ -46,6 +46,8 @@ namespace Lucky.Home.Devices
         private ushort _lastFault = 0;
         private IStatusUpdate _lastFaultMessage;
         private bool _inConnectionMode;
+        private bool _terminating;
+        private TaskCompletionSource<object> _terminated = new TaskCompletionSource<object>();
 
         public SamilInverterLoggerDevice()
             : base("SAMIL")
@@ -58,7 +60,7 @@ namespace Lucky.Home.Devices
             _inConnectionMode = true;
 
             // Start wait loop
-            while (!IsDisposed)
+            while (!_terminating)
             {
                 if (_inConnectionMode)
                 {
@@ -72,6 +74,17 @@ namespace Lucky.Home.Devices
                     await PollData();
                 }
             }
+
+            // Do a clean logout
+            await LogoutInverter();
+            _terminated.SetResult(null);
+        }
+
+        protected override async Task OnTerminate()
+        {
+            _terminating = true;
+            await _terminated.Task;
+            await base.OnTerminate();
         }
 
         private void StartConnectionTimer()
@@ -152,16 +165,27 @@ namespace Lucky.Home.Devices
             return (CheckProtocolWRes(line, phase, request, expResponse, (err, bytes, msg) => ReportFault("Unexpected " + phase, bytes, msg, err), warn)) != null;
         }
 
+        private async Task LogoutInverter(HalfDuplexLineSink line = null)
+        {
+            if (line == null)
+            {
+                line = Sinks.OfType<HalfDuplexLineSink>().FirstOrDefault();
+            }
+            if (line != null)
+            {
+                // Send 3 logout messages
+                for (int i = 0; i < 3; i++)
+                {
+                    var r = await line.SendReceive(LogoutMessage.ToBytes(), false, false, "logout");
+                    // Ignore errors
+                    await Task.Delay(500);
+                }
+            }
+        }
+
         private async Task<bool> LoginInverter(HalfDuplexLineSink line)
         {
-            // Send 3 logout messages
-            for (int i = 0; i < 3; i++)
-            {
-                var r = await line.SendReceive(LogoutMessage.ToBytes(), false, false, "logout");
-                // Ignore errors
-                await Task.Delay(500);
-            }
-
+            await LogoutInverter(line);
             var res = await CheckProtocolWRes(line, "bcast", BroadcastRequest, BroadcastResponse, (er, bytes, msg) =>
                 {
                     if (!InNightMode)
