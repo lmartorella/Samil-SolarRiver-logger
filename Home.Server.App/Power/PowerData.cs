@@ -84,15 +84,15 @@ namespace Lucky.Home.Power
         public int Mode;
         [Csv("0")]
         public double EnergyTodayWh;
-        [Csv("0:00")]
+        [Csv("0.00")]
         public double GridCurrentA;
-        [Csv("0:00")]
+        [Csv("0.00")]
         public double PanelCurrentA;
-        [Csv("0:0")]
+        [Csv("0.0")]
         public double GridVoltageV;
-        [Csv("0:0")]
+        [Csv("0.0")]
         public double PanelVoltageV;
-        [Csv("0:00")]
+        [Csv("0.00")]
         public double GridFrequencyHz;
         // Bitwise? 0x800 = no grid power
         [Csv("0")]

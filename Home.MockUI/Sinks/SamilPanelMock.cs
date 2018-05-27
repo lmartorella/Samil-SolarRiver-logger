@@ -24,7 +24,8 @@ namespace Lucky.HomeMock.Sinks
 
         public override void Read(BinaryReader reader)
         {
-            var msg = ReadMessage(reader);
+            Mode mode;
+            var msg = ReadMessage(reader, out mode);
             switch (msg)
             {
                 case "55 aa 00 00 00 00 00 04 00 01 03":
@@ -97,7 +98,7 @@ namespace Lucky.HomeMock.Sinks
                     break;
 
                 default:
-                    throw new InvalidOperationException("Unknown message");
+                    throw new InvalidOperationException("Unknown message: " + msg);
             }
         }
 
@@ -106,8 +107,20 @@ namespace Lucky.HomeMock.Sinks
             _response = bytes.Split(' ').Select(s => byte.Parse(s, NumberStyles.HexNumber)).ToArray();
         }
 
-        private string ReadMessage(BinaryReader reader)
+        private enum Mode : byte
         {
+            Normal = 0,
+            NoResponse = 0xfe,
+            Echo = 0xff
+        }
+
+        private string ReadMessage(BinaryReader reader, out Mode mode)
+        {
+            mode = (Mode)reader.ReadByte();
+            if (mode != Mode.Normal && mode != Mode.NoResponse)
+            {
+                throw new InvalidOperationException("UNSUPPORTED MODE: 0x" + mode.ToString("x2"));
+            }
             int msgLen = reader.ReadByte() + (reader.ReadByte() << 8);
             List<byte> ret = new List<byte>();
             for (int i = 0; i < msgLen; i++)
