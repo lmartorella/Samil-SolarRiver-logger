@@ -46,7 +46,7 @@ namespace Lucky.Home.Devices
         private ushort _lastFault = 0;
         private IStatusUpdate _lastFaultMessage;
         private bool _inConnectionMode;
-        private bool _terminating;
+        private CancellationTokenSource _terminating = new CancellationTokenSource();
         private TaskCompletionSource<object> _terminated = new TaskCompletionSource<object>();
 
         public SamilInverterLoggerDevice()
@@ -60,19 +60,26 @@ namespace Lucky.Home.Devices
             _inConnectionMode = true;
 
             // Start wait loop
-            while (!_terminating)
+            try
             {
-                if (_inConnectionMode)
+                while (!_terminating.IsCancellationRequested)
                 {
-                    await Task.Delay(InNightMode ? CheckConnectionPeriodNight : CheckConnectionPeriodDay);
-                    await CheckConnection();
+                    if (_inConnectionMode)
+                    {
+                        await Task.Delay(InNightMode ? CheckConnectionPeriodNight : CheckConnectionPeriodDay, _terminating.Token);
+                        await CheckConnection();
+                    }
+                    else
+                    {
+                        // Poll SAMIL for data
+                        await Task.Delay(PollDataPeriod, _terminating.Token);
+                        await PollData();
+                    }
                 }
-                else
-                {
-                    // Poll SAMIL for data
-                    await Task.Delay(PollDataPeriod);
-                    await PollData();
-                }
+            }
+            catch (TaskCanceledException)
+            {
+
             }
 
             // Do a clean logout
@@ -82,7 +89,7 @@ namespace Lucky.Home.Devices
 
         protected override async Task OnTerminate()
         {
-            _terminating = true;
+            _terminating.Cancel();
             await _terminated.Task;
             await base.OnTerminate();
         }
