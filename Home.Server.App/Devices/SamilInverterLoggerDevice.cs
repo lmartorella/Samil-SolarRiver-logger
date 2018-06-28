@@ -106,10 +106,23 @@ namespace Lucky.Home.Devices
 
         public PowerData ImmediateData { get; private set; }
 
+        private HalfDuplexLineSink Sink
+        {
+            get
+            {
+                var line = Sinks.OfType<HalfDuplexLineSink>().FirstOrDefault();
+                if (line != null && !line.IsOnline)
+                {
+                    return null;
+                }
+                return line;
+            }
+        }
+
         private async Task CheckConnection()
         {
             // Poll the line
-            var line = Sinks.OfType<HalfDuplexLineSink>().FirstOrDefault();
+            var line = Sink;
             if (line == null)
             {
                 // No sink
@@ -176,7 +189,7 @@ namespace Lucky.Home.Devices
         {
             if (line == null)
             {
-                line = Sinks.OfType<HalfDuplexLineSink>().FirstOrDefault();
+                line = Sink;
             }
             if (line != null)
             {
@@ -259,7 +272,7 @@ namespace Lucky.Home.Devices
 
         private async Task PollData()
         {
-            var line = Sinks.OfType<HalfDuplexLineSink>().FirstOrDefault();
+            var line = Sink;
             if (line == null)
             {
                 // disconnect
