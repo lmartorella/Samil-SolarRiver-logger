@@ -181,7 +181,7 @@ namespace Lucky.Home.Devices
         public SamilInverterDeviceBase(string name)
         {
             Name = name;
-            _logger = Manager.GetService<LoggerFactory>().Create("Samil_" + Name);
+            _logger = Manager.GetService<ILoggerFactory>().Create("Samil_" + Name);
         }
 
         protected async Task<SamilMsg> CheckProtocolWRes(HalfDuplexLineSink line, string opName, SamilMsg request, SamilMsg expResponse, Action<HalfDuplexLineSink.Error, byte[], SamilMsg> reportFault, Action<SamilMsg> reportWarning = null, bool echo = false)

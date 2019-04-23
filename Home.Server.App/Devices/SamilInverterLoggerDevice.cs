@@ -1,5 +1,4 @@
 ﻿using Lucky.Db;
-using Lucky.Home.Notification;
 using Lucky.Home.Power;
 using Lucky.Home.Sinks;
 using Lucky.Home.Services;
