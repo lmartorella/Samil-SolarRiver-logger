@@ -178,15 +178,5 @@ namespace Lucky.HomeMock.Sinks
             writer.Write(_response);
             _response = new byte[0];
         }
-
-        private void Log(string command)
-        {
-            LogLine?.Invoke(this, new ItemEventArgs<string>("Solar: " + command));
-        }
-
-        /// <summary>
-        /// For logging
-        /// </summary>
-        public event EventHandler<ItemEventArgs<string>> LogLine;
     }
 }
