@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 namespace Lucky.Home.Devices
 {
+    /// <summary>
+    /// Manual tester for samil device. Receive commands from a command sink and routes it to the inverter.
+    /// </summary>
     [Device("Samil Tester Message")]
     [Requires(typeof(HalfDuplexLineSink))]
     [Requires(typeof(MockCommandSink))]

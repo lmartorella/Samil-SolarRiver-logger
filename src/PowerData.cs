@@ -5,6 +5,9 @@ using System.Linq;
 
 namespace Lucky.Home.Power
 {
+    /// <summary>
+    /// CSV for daily power summary
+    /// </summary>
     public class DayPowerData : DayTimeSample<PowerData>
     {
         /// <summary>
@@ -73,6 +76,9 @@ namespace Lucky.Home.Power
         }
     }
 
+    /// <summary>
+    /// CSV for tick-by-tick power data
+    /// </summary>
     public class PowerData : TimeSample
     {
         [Csv("0")]

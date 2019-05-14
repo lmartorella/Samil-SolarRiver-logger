@@ -12,6 +12,9 @@ using System.Threading.Tasks;
 
 namespace Lucky.Home.Devices
 {
+    /// <summary>
+    /// Device that logs solar power immediate readings and stats
+    /// </summary>
     [Device("Samil Inverter")]
     [Requires(typeof(HalfDuplexLineSink))]
     class SamilInverterLoggerDevice : SamilInverterDeviceBase, ISolarPanelDevice
