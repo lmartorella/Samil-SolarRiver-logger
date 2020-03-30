@@ -435,7 +435,7 @@ namespace Lucky.Home.Devices
             {
                 //Tuple.Create(chart, new ContentType("image/png"), "summary")
             };
-            Manager.GetService<INotificationService>().SendHtmlMail(title, body, attachments);
+            Manager.GetService<INotificationService>().SendHtmlMail(title, body, false, attachments);
             Logger.Log("DailyMailSent", "Power", day.PowerKWh);
         }
     }
