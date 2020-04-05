@@ -34,6 +34,18 @@ namespace Lucky.Home.Power
         [Csv("0")]
         public int Fault;
 
+        /// <summary>
+        /// Peak power
+        /// </summary>
+        [Csv("0.00")]
+        public double PeakPowerW;
+
+        /// <summary>
+        /// Time of day of the peak power
+        /// </summary>
+        [Csv("hh\\:mm\\:ss")]
+        public TimeSpan PeakTimestamp;
+
         public override bool Aggregate(DateTime date, IEnumerable<PowerData> data)
         {
             Date = date;
@@ -41,6 +53,7 @@ namespace Lucky.Home.Power
             // Find first/last valid samples
             DateTime? first = data.FirstOrDefault(t => t.PowerW > 0)?.TimeStamp;
             DateTime? last = data.LastOrDefault(t => t.PowerW > 0)?.TimeStamp;
+
             if (first.HasValue && last.HasValue && !first.Value.Equals(last.Value))
             {
                 // Have a sun range
@@ -67,6 +80,11 @@ namespace Lucky.Home.Power
                 totalPower += lastSample;
 
                 PowerKWh = totalPower / 1000.0;
+
+                // Calc max power
+                var maxPowerSample = data.Aggregate((i1, i2) => i1.PowerW > i2.PowerW ? i1 : i2);
+                PeakPowerW = maxPowerSample.PowerW;
+                PeakTimestamp = maxPowerSample.TimeStamp.TimeOfDay;
                 return true;
             }
             else

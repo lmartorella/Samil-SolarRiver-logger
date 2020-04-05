@@ -10,7 +10,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Lucky.Home.Devices
+namespace Lucky.Home.Devices.Solar
 {
     /// <summary>
     /// Device that logs solar power immediate readings and stats
@@ -50,10 +50,21 @@ namespace Lucky.Home.Devices
         private bool _inConnectionMode;
         private CancellationTokenSource _terminating = new CancellationTokenSource();
         private TaskCompletionSource<object> _terminated = new TaskCompletionSource<object>();
+        private EventHandler<PipeServer.MessageEventArgs> _pipeMessageHandler;
 
         public SamilInverterLoggerDevice()
             : base("SAMIL")
         {
+            _pipeMessageHandler = (o, e) =>
+            {
+                switch (e.Request.Command)
+                {
+                    case "solar.getStatus":
+                        e.Response = Task.FromResult(GetPvData() as WebResponse);
+                        break;
+                }
+            };
+            Manager.GetService<PipeServer>().Message += _pipeMessageHandler;
         }
 
         public async Task StartLoop(ITimeSeries<PowerData, DayPowerData> database)
@@ -91,6 +102,7 @@ namespace Lucky.Home.Devices
 
         protected override async Task OnTerminate()
         {
+            Manager.GetService<PipeServer>().Message -= _pipeMessageHandler;
             _terminating.Cancel();
             await _terminated.Task;
             await base.OnTerminate();
@@ -437,6 +449,31 @@ namespace Lucky.Home.Devices
             };
             Manager.GetService<INotificationService>().SendHtmlMail(title, body, false, attachments);
             Logger.Log("DailyMailSent", "Power", day.PowerKWh);
+        }
+
+        /// <summary>
+        /// Called by web GUI
+        /// </summary>
+        private SolarWebResponse GetPvData() 
+        {
+            // Now parse it
+            var lastSample = Database.GetLastSample();
+
+            var ret = new SolarWebResponse { Online = IsFullOnline };
+            if (lastSample != null) {
+                ret.CurrentW = lastSample.PowerW;
+                ret.CurrentTs = lastSample.TimeStamp.ToString("F");
+                ret.TotalDayWh = lastSample.EnergyTodayWh;
+                ret.TotalKwh = lastSample.TotalEnergyKWh; 
+                ret.Mode = lastSample.Mode;
+                ret.Fault = lastSample.Fault;
+
+                // Find the peak power
+                var dayData = Database.GetAggregatedData();
+                ret.PeakW = dayData.PeakPowerW;
+                ret.PeakTsTime = dayData.PeakTimestamp.ToString("hh\\:mm\\:ss");
+            }
+            return ret;
         }
     }
 }
