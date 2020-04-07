@@ -28,7 +28,11 @@ namespace Lucky.Home.Devices.Solar
         /// <summary>
         /// After this time of no samples, enter night mode
         /// </summary>
+#if !DEBUG
         private static readonly TimeSpan EnterNightModeAfter = TimeSpan.FromMinutes(2);
+#else
+        private static readonly TimeSpan EnterNightModeAfter = TimeSpan.FromSeconds(15);
+#endif
 
         /// <summary>
         /// During day (e.g. when samples are working), retry every 10 seconds
@@ -38,7 +42,11 @@ namespace Lucky.Home.Devices.Solar
         /// <summary>
         /// During noght (e.g. when last sample is older that 2 minutes), retry every 2 minutes
         /// </summary>
+#if !DEBUG
         private static readonly TimeSpan CheckConnectionPeriodNight = TimeSpan.FromMinutes(2);
+#else
+        private static readonly TimeSpan CheckConnectionPeriodNight = TimeSpan.FromSeconds(15);
+#endif
 
         /// <summary>
         /// Get a solar PV sample every 15 seconds
@@ -157,7 +165,14 @@ namespace Lucky.Home.Devices.Solar
                 {
                     if (DateTime.Now - _lastValidData > EnterNightModeAfter)
                     {
-                        InNightMode = true;
+                        try
+                        {
+                            InNightMode = true;
+                        }
+                        catch (Exception exc)
+                        {
+                            Logger.Exception(exc);
+                        }
                     }
                 }
             }
@@ -440,14 +455,14 @@ namespace Lucky.Home.Devices.Solar
 
         private void SendSummaryMail(DayPowerData day)
         {
-            var title = Resources.solar_daily_summary_title.Replace("{0}", day.PowerKWh.ToString("0.0"));
-            var body = Resources.solar_daily_summary.Replace("{0}", day.PowerKWh.ToString("0.00"));
-            //var chart = lastPeriod.ToChart().ToPng(250, 250);
-            var attachments = new Tuple<Stream, ContentType, string>[]
-            {
-                //Tuple.Create(chart, new ContentType("image/png"), "summary")
-            };
-            Manager.GetService<INotificationService>().SendHtmlMail(title, body, false, attachments);
+            var title = string.Format(Resources.solar_daily_summary_title, day.PowerKWh);
+            var body = Resources.solar_daily_summary
+                    .Replace("{PowerKWh}", day.PowerKWh.ToString("0.0"))
+                    .Replace("{PeakPowerW}", day.PeakPowerW.ToString())
+                    .Replace("{PeakTimestamp}", day.FromInvariantTime(day.PeakTimestamp).ToString("hh\\:mm\\:ss"))
+                    .Replace("{SunTime}", (day.Last - day.First).ToString("h' hours and 'mm' minutes'"));
+
+            Manager.GetService<INotificationService>().SendMail(title, body, false);
             Logger.Log("DailyMailSent", "Power", day.PowerKWh);
         }
 
@@ -462,7 +477,7 @@ namespace Lucky.Home.Devices.Solar
             var ret = new SolarWebResponse { Online = IsFullOnline };
             if (lastSample != null) {
                 ret.CurrentW = lastSample.PowerW;
-                ret.CurrentTs = lastSample.TimeStamp.ToString("F");
+                ret.CurrentTs = lastSample.FromInvariantTime(lastSample.TimeStamp).ToString("F");
                 ret.TotalDayWh = lastSample.EnergyTodayWh;
                 ret.TotalKwh = lastSample.TotalEnergyKWh; 
                 ret.Mode = lastSample.Mode;
@@ -471,7 +486,7 @@ namespace Lucky.Home.Devices.Solar
                 // Find the peak power
                 var dayData = Database.GetAggregatedData();
                 ret.PeakW = dayData.PeakPowerW;
-                ret.PeakTsTime = dayData.PeakTimestamp.ToString("hh\\:mm\\:ss");
+                ret.PeakTsTime = dayData.FromInvariantTime(dayData.PeakTimestamp).ToString("hh\\:mm\\:ss");
             }
             return ret;
         }
