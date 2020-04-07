@@ -3,9 +3,7 @@ using Lucky.Home.Power;
 using Lucky.Home.Sinks;
 using Lucky.Home.Services;
 using System;
-using System.IO;
 using System.Linq;
-using System.Net.Mime;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -37,7 +35,11 @@ namespace Lucky.Home.Devices.Solar
         /// <summary>
         /// During day (e.g. when samples are working), retry every 10 seconds
         /// </summary>
+#if !DEBUG
         private static readonly TimeSpan CheckConnectionPeriodDay = TimeSpan.FromSeconds(10);
+#else
+        private static readonly TimeSpan CheckConnectionPeriodDay = TimeSpan.FromSeconds(2);
+#endif
 
         /// <summary>
         /// During noght (e.g. when last sample is older that 2 minutes), retry every 2 minutes
