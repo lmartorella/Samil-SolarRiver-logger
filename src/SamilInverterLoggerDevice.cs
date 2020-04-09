@@ -36,7 +36,7 @@ namespace Lucky.Home.Devices.Solar
         /// During day (e.g. when samples are working), retry every 10 seconds
         /// </summary>
 #if !DEBUG
-        private static readonly TimeSpan CheckConnectionPeriodDay = TimeSpan.FromSeconds(10);
+        private static readonly TimeSpan CheckConnectionPeriodDay = TimeSpan.FromSeconds(10); // Less than grace time
 #else
         private static readonly TimeSpan CheckConnectionPeriodDay = TimeSpan.FromSeconds(2);
 #endif
