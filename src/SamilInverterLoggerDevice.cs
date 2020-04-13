@@ -462,7 +462,7 @@ namespace Lucky.Home.Devices.Solar
                     .Replace("{PowerKWh}", day.PowerKWh.ToString("0.0"))
                     .Replace("{PeakPowerW}", day.PeakPowerW.ToString())
                     .Replace("{PeakTimestamp}", day.FromInvariantTime(day.PeakTimestamp).ToString("hh\\:mm\\:ss"))
-                    .Replace("{SunTime}", (day.Last - day.First).ToString("h' hours and 'mm' minutes'"));
+                    .Replace("{SunTime}", (day.Last - day.First).ToString(Resources.solar_daylight_format));
 
             Manager.GetService<INotificationService>().SendMail(title, body, false);
             Logger.Log("DailyMailSent", "Power", day.PowerKWh);
@@ -487,8 +487,11 @@ namespace Lucky.Home.Devices.Solar
 
                 // Find the peak power
                 var dayData = Database.GetAggregatedData();
-                ret.PeakW = dayData.PeakPowerW;
-                ret.PeakTsTime = dayData.FromInvariantTime(dayData.PeakTimestamp).ToString("hh\\:mm\\:ss");
+                if (dayData != null)
+                {
+                    ret.PeakW = dayData.PeakPowerW;
+                    ret.PeakTsTime = dayData.FromInvariantTime(dayData.PeakTimestamp).ToString("hh\\:mm\\:ss");
+                }
             }
             return ret;
         }
