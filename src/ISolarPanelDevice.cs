@@ -2,7 +2,7 @@
 using Lucky.Home.Power;
 using System.Threading.Tasks;
 
-namespace Lucky.Home.Devices
+namespace Lucky.Home.Devices.Solar
 {
     interface ISolarPanelDevice : IDevice
     {

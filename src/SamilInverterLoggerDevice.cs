@@ -3,14 +3,12 @@ using Lucky.Home.Power;
 using Lucky.Home.Sinks;
 using Lucky.Home.Services;
 using System;
-using System.IO;
 using System.Linq;
-using System.Net.Mime;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Lucky.Home.Devices
+namespace Lucky.Home.Devices.Solar
 {
     /// <summary>
     /// Device that logs solar power immediate readings and stats
@@ -28,17 +26,29 @@ namespace Lucky.Home.Devices
         /// <summary>
         /// After this time of no samples, enter night mode
         /// </summary>
+#if !DEBUG
         private static readonly TimeSpan EnterNightModeAfter = TimeSpan.FromMinutes(2);
+#else
+        private static readonly TimeSpan EnterNightModeAfter = TimeSpan.FromSeconds(15);
+#endif
 
         /// <summary>
         /// During day (e.g. when samples are working), retry every 10 seconds
         /// </summary>
+#if !DEBUG
         private static readonly TimeSpan CheckConnectionPeriodDay = TimeSpan.FromSeconds(10);
+#else
+        private static readonly TimeSpan CheckConnectionPeriodDay = TimeSpan.FromSeconds(2);
+#endif
 
         /// <summary>
         /// During noght (e.g. when last sample is older that 2 minutes), retry every 2 minutes
         /// </summary>
+#if !DEBUG
         private static readonly TimeSpan CheckConnectionPeriodNight = TimeSpan.FromMinutes(2);
+#else
+        private static readonly TimeSpan CheckConnectionPeriodNight = TimeSpan.FromSeconds(15);
+#endif
 
         /// <summary>
         /// Get a solar PV sample every 15 seconds
@@ -50,10 +60,21 @@ namespace Lucky.Home.Devices
         private bool _inConnectionMode;
         private CancellationTokenSource _terminating = new CancellationTokenSource();
         private TaskCompletionSource<object> _terminated = new TaskCompletionSource<object>();
+        private EventHandler<PipeServer.MessageEventArgs> _pipeMessageHandler;
 
         public SamilInverterLoggerDevice()
             : base("SAMIL")
         {
+            _pipeMessageHandler = (o, e) =>
+            {
+                switch (e.Request.Command)
+                {
+                    case "solar.getStatus":
+                        e.Response = Task.FromResult(GetPvData() as WebResponse);
+                        break;
+                }
+            };
+            Manager.GetService<PipeServer>().Message += _pipeMessageHandler;
         }
 
         public async Task StartLoop(ITimeSeries<PowerData, DayPowerData> database)
@@ -91,6 +112,7 @@ namespace Lucky.Home.Devices
 
         protected override async Task OnTerminate()
         {
+            Manager.GetService<PipeServer>().Message -= _pipeMessageHandler;
             _terminating.Cancel();
             await _terminated.Task;
             await base.OnTerminate();
@@ -145,7 +167,14 @@ namespace Lucky.Home.Devices
                 {
                     if (DateTime.Now - _lastValidData > EnterNightModeAfter)
                     {
-                        InNightMode = true;
+                        try
+                        {
+                            InNightMode = true;
+                        }
+                        catch (Exception exc)
+                        {
+                            Logger.Exception(exc);
+                        }
                     }
                 }
             }
@@ -428,15 +457,43 @@ namespace Lucky.Home.Devices
 
         private void SendSummaryMail(DayPowerData day)
         {
-            var title = Resources.solar_daily_summary_title.Replace("{0}", day.PowerKWh.ToString("0.0"));
-            var body = Resources.solar_daily_summary.Replace("{0}", day.PowerKWh.ToString("0.00"));
-            //var chart = lastPeriod.ToChart().ToPng(250, 250);
-            var attachments = new Tuple<Stream, ContentType, string>[]
-            {
-                //Tuple.Create(chart, new ContentType("image/png"), "summary")
-            };
-            Manager.GetService<INotificationService>().SendHtmlMail(title, body, false, attachments);
+            var title = string.Format(Resources.solar_daily_summary_title, day.PowerKWh);
+            var body = Resources.solar_daily_summary
+                    .Replace("{PowerKWh}", day.PowerKWh.ToString("0.0"))
+                    .Replace("{PeakPowerW}", day.PeakPowerW.ToString())
+                    .Replace("{PeakTimestamp}", day.FromInvariantTime(day.PeakTimestamp).ToString("hh\\:mm\\:ss"))
+                    .Replace("{SunTime}", (day.Last - day.First).ToString(Resources.solar_daylight_format));
+
+            Manager.GetService<INotificationService>().SendMail(title, body, false);
             Logger.Log("DailyMailSent", "Power", day.PowerKWh);
+        }
+
+        /// <summary>
+        /// Called by web GUI
+        /// </summary>
+        private SolarWebResponse GetPvData() 
+        {
+            // Now parse it
+            var lastSample = Database.GetLastSample();
+
+            var ret = new SolarWebResponse { Online = IsFullOnline };
+            if (lastSample != null) {
+                ret.CurrentW = lastSample.PowerW;
+                ret.CurrentTs = lastSample.FromInvariantTime(lastSample.TimeStamp).ToString("F");
+                ret.TotalDayWh = lastSample.EnergyTodayWh;
+                ret.TotalKwh = lastSample.TotalEnergyKWh; 
+                ret.Mode = lastSample.Mode;
+                ret.Fault = lastSample.Fault;
+
+                // Find the peak power
+                var dayData = Database.GetAggregatedData();
+                if (dayData != null)
+                {
+                    ret.PeakW = dayData.PeakPowerW;
+                    ret.PeakTsTime = dayData.FromInvariantTime(dayData.PeakTimestamp).ToString("hh\\:mm\\:ss");
+                }
+            }
+            return ret;
         }
     }
 }

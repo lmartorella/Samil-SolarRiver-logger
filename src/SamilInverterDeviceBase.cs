@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using Lucky.Home.Sinks;
 using System.Threading.Tasks;
 
-namespace Lucky.Home.Devices
+namespace Lucky.Home.Devices.Solar
 {
     /// <summary>
     /// Base device class for solar logger
@@ -29,34 +29,6 @@ namespace Lucky.Home.Devices
         protected static readonly SamilMsg UnknownResponse2 = new SamilMsg(AddressToAllocate, 0, 1, 0x81);
         protected static readonly SamilMsg GetPvDataMessage = new SamilMsg(0, AddressToAllocate, 1, 2);
         protected static readonly SamilMsg GetPvDataResponse = new SamilMsg(AddressToAllocate, 0, 1, 0x82);
-        // TODO: decode fwversion:
-        /**
-        <register>
-          <type value="bytes" />
-          <size value="1" />
-        </register>
-        <register>
-          <type value="string" />
-          <size value="6" />
-          <name value="Capacity" />
-        </register>
-        <register>
-          <type value="string" />
-          <size value="5" />
-          <name value="Firmware" />
-        </register>
-        <register>
-          <type value="string" />
-          <size value="16" />
-          <content value="Model" />
-        </register>
-        <register>
-          <type value="string" />
-          <size value="16" />
-          <content value="Manufacturer" />
-        </register>
-      </message>
-    */
         protected static readonly SamilMsg GetFwVersionMessage = new SamilMsg(0, AddressToAllocate, 1, 3);
         protected static readonly SamilMsg GetFwVersionResponse = new SamilMsg(AddressToAllocate, 0, 1, 0x83);
         protected static readonly SamilMsg GetConfInfoMessage = new SamilMsg(0, AddressToAllocate, 1, 4);

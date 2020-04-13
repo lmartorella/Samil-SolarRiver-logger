@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Lucky.Home.Devices
+namespace Lucky.Home.Devices.Solar
 {
     /// <summary>
     /// Manual tester for samil device. Receive commands from a command sink and routes it to the inverter.
