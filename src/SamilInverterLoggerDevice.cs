@@ -11,10 +11,12 @@ using System.Threading.Tasks;
 namespace Lucky.Home.Devices.Solar
 {
     /// <summary>
-    /// Device that logs solar power immediate readings and stats
+    /// Device that logs solar power immediate readings and stats.
+    /// Secondary sink: home power current consumption for Net Metering (NEM)
     /// </summary>
     [Device("Samil Inverter")]
     [Requires(typeof(HalfDuplexLineSink))]
+    [Requires(typeof(AnalogIntegratorSink))]
     class SamilInverterLoggerDevice : SamilInverterDeviceBase, ISolarPanelDevice
     {
         private bool _noSink;
@@ -22,6 +24,11 @@ namespace Lucky.Home.Devices.Solar
         private bool _isSummarySent = true;
         private DateTime _lastValidData = DateTime.Now;
         private ITimeSeries<PowerData, DayPowerData> Database { get; set; }
+
+        /// <summary>
+        /// This will never resets, and keep track of the last sampled grid voltage. Used even during night by home ammeter
+        /// </summary>
+        private double _lastPanelVoltageV = -1.0;
 
         /// <summary>
         /// After this time of no samples, enter night mode
@@ -42,7 +49,7 @@ namespace Lucky.Home.Devices.Solar
 #endif
 
         /// <summary>
-        /// During noght (e.g. when last sample is older that 2 minutes), retry every 2 minutes
+        /// During night (e.g. when last sample is older that 2 minutes), retry every 2 minutes
         /// </summary>
 #if !DEBUG
         private static readonly TimeSpan CheckConnectionPeriodNight = TimeSpan.FromMinutes(2);
@@ -70,7 +77,7 @@ namespace Lucky.Home.Devices.Solar
                 switch (e.Request.Command)
                 {
                     case "solar.getStatus":
-                        e.Response = Task.FromResult(GetPvData() as WebResponse);
+                        e.Response = GetPvData();
                         break;
                 }
             };
@@ -130,7 +137,7 @@ namespace Lucky.Home.Devices.Solar
 
         public PowerData ImmediateData { get; private set; }
 
-        private HalfDuplexLineSink Sink
+        private HalfDuplexLineSink InverterSink
         {
             get
             {
@@ -143,10 +150,23 @@ namespace Lucky.Home.Devices.Solar
             }
         }
 
+        private AnalogIntegratorSink AmmeterSink
+        {
+            get
+            {
+                var ammeter = Sinks.OfType<AnalogIntegratorSink>().FirstOrDefault();
+                if (ammeter != null && !ammeter.IsOnline)
+                {
+                    return null;
+                }
+                return ammeter;
+            }
+        }
+
         private async Task CheckConnection()
         {
             // Poll the line
-            var line = Sink;
+            var line = InverterSink;
             if (line == null)
             {
                 // No sink
@@ -220,7 +240,7 @@ namespace Lucky.Home.Devices.Solar
         {
             if (line == null)
             {
-                line = Sink;
+                line = InverterSink;
             }
             if (line != null)
             {
@@ -303,13 +323,15 @@ namespace Lucky.Home.Devices.Solar
 
         private async Task PollData()
         {
-            var line = Sink;
+            var line = InverterSink;
             if (line == null)
             {
                 // disconnect
                 StartConnectionTimer();
                 return;
             }
+
+            // Fetch solar power data from inverter
             var res = await CheckProtocolWRes(line, "pv", GetPvDataMessage, GetPvDataResponse, (err, bytes, msg) => ReportFault("Unexpected PV data", bytes, msg, err));
             if (res == null)
             {
@@ -317,24 +339,49 @@ namespace Lucky.Home.Devices.Solar
                 StartConnectionTimer();
                 return;
             }
+
             // Decode and record data
-            if (!DecodePvData(res.Payload))
+            var data = DecodePvData(res.Payload);
+            if (data == null)
             {
                 // Report invalid msg
-                ReportWarning("Invalid/strange PV data", res);
+                ReportWarning("Invalid/unknown PV data", res);
+                return;
             }
-            else
+
+            // Use the current grid voltage to calculate Net Energy Metering
+            var ammeter = AmmeterSink;
+            if (ammeter != null && data.GridVoltageV > 0)
             {
-                // Store last timestamp
-                _lastValidData = DateTime.Now;
+                data.HomeUsageCurrentA = await ammeter.ReadData(-1.0);
+            }
+
+            var db = Database;
+            if (db != null)
+            {
+                db.AddNewSample(data);
+                if (data.PowerW > 0)
+                {
+                    // New data, unlock next mail
+                    _isSummarySent = false;
+                }
+
+                CheckFault(data.Fault);
+            }
+
+            // Store last timestamp
+            _lastValidData = DateTime.Now;
+            if (data.GridVoltageV > 0)
+            {
+                _lastPanelVoltageV = data.GridVoltageV;
             }
         }
 
-        private bool DecodePvData(byte[] payload)
+        private PowerData DecodePvData(byte[] payload)
         {
             if (payload.Length != 50)
             {
-                return false;
+                return null;
             }
 
             int panelVoltage = ExtractW(payload, 1);
@@ -347,35 +394,26 @@ namespace Lucky.Home.Devices.Solar
             int gridFrequency = ExtractW(payload, 21);
             int gridPower = ExtractW(payload, 22);
             int totalPower = (ExtractW(payload, 23) << 16) + ExtractW(payload, 24);
-
-            var db = Database;
-            if (db != null)
+            if (!payload.All(b => b == 0))
             {
-                var data = new PowerData
-                {
-                    TimeStamp = DateTime.Now,
-                    PowerW = gridPower,
-                    PanelVoltageV = panelVoltage / 10.0,
-                    GridVoltageV = gridVoltage / 10.0,
-                    PanelCurrentA = panelCurrent / 10.0,
-                    GridCurrentA = gridCurrent / 10.0,
-                    Mode = mode,
-                    Fault = fault,
-                    EnergyTodayWh = energyToday * 10.0,
-                    GridFrequencyHz = gridFrequency / 100.0,
-                    TotalEnergyKWh = totalPower / 10.0
-                };
-                db.AddNewSample(data);
-                if (gridPower > 0)
-                {
-                    // New data, unlock next mail
-                    _isSummarySent = false;
-                }
-
-                CheckFault(data.Fault);
+                // Something unknown/not yet decoded happened
+                return null;
             }
 
-            return payload.All(b => b == 0);
+            return new PowerData
+            {
+                TimeStamp = DateTime.Now,
+                PowerW = gridPower,
+                PanelVoltageV = panelVoltage / 10.0,
+                GridVoltageV = gridVoltage / 10.0,
+                PanelCurrentA = panelCurrent / 10.0,
+                GridCurrentA = gridCurrent / 10.0,
+                Mode = mode,
+                Fault = fault,
+                EnergyTodayWh = energyToday * 10.0,
+                GridFrequencyHz = gridFrequency / 100.0,
+                TotalEnergyKWh = totalPower / 10.0
+            };
         }
 
         private ushort ExtractW(byte[] payload, int pos)
@@ -471,12 +509,10 @@ namespace Lucky.Home.Devices.Solar
         /// <summary>
         /// Called by web GUI
         /// </summary>
-        private SolarWebResponse GetPvData() 
+        private async Task<WebResponse> GetPvData() 
         {
-            // Now parse it
-            var lastSample = Database.GetLastSample();
-
             var ret = new SolarWebResponse { Online = IsFullOnline };
+            var lastSample = Database.GetLastSample();
             if (lastSample != null) {
                 ret.CurrentW = lastSample.PowerW;
                 ret.CurrentTs = lastSample.FromInvariantTime(lastSample.TimeStamp).ToString("F");
@@ -484,6 +520,12 @@ namespace Lucky.Home.Devices.Solar
                 ret.TotalKwh = lastSample.TotalEnergyKWh; 
                 ret.Mode = lastSample.Mode;
                 ret.Fault = lastSample.Fault;
+
+                // From a recover boot 
+                if (_lastPanelVoltageV <= 0 && lastSample.GridVoltageV > 0)
+                {
+                    _lastPanelVoltageV = lastSample.GridVoltageV;
+                }
 
                 // Find the peak power
                 var dayData = Database.GetAggregatedData();
@@ -493,6 +535,15 @@ namespace Lucky.Home.Devices.Solar
                     ret.PeakTsTime = dayData.FromInvariantTime(dayData.PeakTimestamp).ToString("hh\\:mm\\:ss");
                 }
             }
+
+            // Always use real-time home appliance power usage
+            ret.GridV = _lastPanelVoltageV;
+            var ammeter = AmmeterSink;
+            if (ammeter != null)
+            {
+                ret.UsageA = await ammeter.ReadData(-1.0);
+            }
+
             return ret;
         }
     }
