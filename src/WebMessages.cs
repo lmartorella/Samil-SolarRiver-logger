@@ -36,5 +36,11 @@ namespace Lucky.Home.Devices.Solar
 
         [DataMember(Name = "peakTsTime")]
         public string PeakTsTime { get; set; }
+
+        // Home usage power, to report Net Energy Metering
+        [DataMember(Name = "gridV")]
+        public double GridV { get; set; }
+        [DataMember(Name = "usageA")]
+        public double UsageA { get; set; }
     }
 }
