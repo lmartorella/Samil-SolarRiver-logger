@@ -25,7 +25,7 @@ namespace Lucky.Home.Devices.Solar
         {
             _timer = new Timer(async o => 
             {
-                if (IsFullOnline)
+                if (OnlineStatus == OnlineStatus.Online)
                 {
                     // Read command...
                     var cmdSink = Sinks.OfType<MockCommandSink>().FirstOrDefault();

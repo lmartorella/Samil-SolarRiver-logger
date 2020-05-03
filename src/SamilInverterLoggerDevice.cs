@@ -16,7 +16,7 @@ namespace Lucky.Home.Devices.Solar
     /// </summary>
     [Device("Samil Inverter")]
     [Requires(typeof(HalfDuplexLineSink))]
-    [Requires(typeof(AnalogIntegratorSink))]
+    [Requires(typeof(AnalogIntegratorSink), Optional = true)]
     class SamilInverterLoggerDevice : SamilInverterDeviceBase, ISolarPanelDevice
     {
         private bool _noSink;
@@ -511,7 +511,10 @@ namespace Lucky.Home.Devices.Solar
         /// </summary>
         private async Task<WebResponse> GetPvData() 
         {
-            var ret = new SolarWebResponse { Online = IsFullOnline };
+            var ret = new SolarWebResponse
+            {
+                Status = OnlineStatus
+            };
             var lastSample = Database.GetLastSample();
             if (lastSample != null) {
                 ret.CurrentW = lastSample.PowerW;

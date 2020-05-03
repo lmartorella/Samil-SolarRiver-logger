@@ -1,5 +1,4 @@
 ﻿using Lucky.Home.Services;
-using Lucky.Home.Sinks;
 using System.Runtime.Serialization;
 
 namespace Lucky.Home.Devices.Solar
@@ -10,8 +9,8 @@ namespace Lucky.Home.Devices.Solar
         /// <summary>
         /// Is the sink online?
         /// </summary>
-        [DataMember(Name = "online")]
-        public bool Online { get; set; }
+        [DataMember(Name = "status")]
+        public OnlineStatus Status{ get; set; }
 
         [DataMember(Name = "currentW")]
         public double CurrentW { get; set; }
