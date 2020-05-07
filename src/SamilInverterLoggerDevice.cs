@@ -515,7 +515,7 @@ namespace Lucky.Home.Devices.Solar
             {
                 Status = OnlineStatus
             };
-            var lastSample = Database.GetLastSample();
+            var lastSample = Database?.GetLastSample();
             if (lastSample != null) {
                 ret.CurrentW = lastSample.PowerW;
                 ret.CurrentTs = lastSample.FromInvariantTime(lastSample.TimeStamp).ToString("F");
