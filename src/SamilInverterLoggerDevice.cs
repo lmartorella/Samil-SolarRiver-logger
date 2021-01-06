@@ -489,6 +489,8 @@ namespace Lucky.Home.Devices.Solar
                     return "Grid frequency too low";
                 case 0x2000:
                     return "Grid frequency too high";
+                case 0x4000:
+                    return "Grid tension too low";
             }
             return "0x" + fault.ToString("X4");
         }
