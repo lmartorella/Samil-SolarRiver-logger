@@ -34,7 +34,7 @@ namespace Lucky.Home.Devices.Solar
         protected static readonly SamilMsg GetConfInfoMessage = new SamilMsg(0, AddressToAllocate, 1, 4);
         protected static readonly SamilMsg GetConfInfoResponse = new SamilMsg(AddressToAllocate, 0, 1, 0x84);
 
-        protected class SamilMsg
+        public class SamilMsg
         {
             private List<byte> _bytes;
 
@@ -82,23 +82,31 @@ namespace Lucky.Home.Devices.Solar
             public static SamilMsg FromBytes(byte[] data, byte[] payload = null)
             {
                 // Transform null in invalid message
-                if (data == null || data.Length < 11)
+                if (data == null)
                 {
-                    return null;
+                    throw new ApplicationException("No data");
                 }
+                if (data.Length < 11)
+                {
+                    throw new ApplicationException("Not enough bytes");
+                }
+
                 // Check size and truncate the sampling
                 int l = data[8];
                 // So the correct data size should be 
                 int dataLength = l + 9 + 2;
                 if (data.Length < dataLength)
                 {
-                    // Truncated
-                    return null;
+                    throw new ApplicationException("Truncated message");
                 }
                 var checksum = data.Take(dataLength - 2).Aggregate((ushort)0, (b1, b2) => (ushort)(b1 + b2));
-                if (WordAt(0, data) != 0x55aa || WordAt(dataLength - 2, data) != checksum)
+                if (WordAt(0, data) != 0x55aa)
                 {
-                    return null;
+                    throw new ApplicationException("Wrong prefix");
+                }
+                if (WordAt(dataLength - 2, data) != checksum)
+                {
+                    throw new ApplicationException("Checksum error: 0x" + WordAt(dataLength - 2, data).ToString("X4") + " instead of 0x" + checksum.ToString("X4"));
                 }
                 return new SamilMsg(WordAt(2, data), WordAt(4, data), data[6], data[7], payload ?? data.Skip(9).Take(l).ToArray());
             }
@@ -156,7 +164,7 @@ namespace Lucky.Home.Devices.Solar
             _logger = Manager.GetService<ILoggerFactory>().Create("Samil_" + Name);
         }
 
-        protected async Task<SamilMsg> CheckProtocolWRes(HalfDuplexLineSink line, string opName, SamilMsg request, SamilMsg expResponse, Action<HalfDuplexLineSink.Error, byte[], SamilMsg> reportFault, Action<SamilMsg> reportWarning = null, bool echo = false)
+        protected async Task<SamilMsg> CheckProtocolWRes(HalfDuplexLineSink line, string opName, SamilMsg request, SamilMsg expResponse, Action<string, HalfDuplexLineSink.Error, byte[], SamilMsg> reportFault, Action<SamilMsg> reportWarning = null, bool echo = false)
         {
             // Broadcast hello message
             var ret = await (line.SendReceive(request.ToBytes(), true, echo, opName));
@@ -164,25 +172,35 @@ namespace Lucky.Home.Devices.Solar
             HalfDuplexLineSink.Error err = ret.Item2;
             if (err != HalfDuplexLineSink.Error.Ok)
             {
-                reportFault(err, rcvBytes, null);
+                reportFault(null, err, rcvBytes, null);
                 return null;
             }
 
-            var res = SamilMsg.FromBytes(rcvBytes);
+            SamilMsg res = null;
+            string dataError = "";
+            try
+            {
+                res = SamilMsg.FromBytes(rcvBytes);
+            }
+            catch (Exception exc)
+            {
+                dataError = exc.Message;
+            }
+
             // Check correct response
             if (res == null && expResponse != null)
             {
-                reportFault(err, rcvBytes, null);
+                reportFault(dataError, err, rcvBytes, null);
                 return null;
             }
             if (res != null && expResponse == null)
             {
-                reportFault(err, rcvBytes, res);
+                reportFault("No response expected", err, rcvBytes, res);
                 return null;
             }
             if (res != null && expResponse != null && !res.CheckStructure(expResponse))
             {
-                reportFault(err, rcvBytes, res);
+                reportFault("Error in to/from protocol", err, rcvBytes, res);
                 return null;
             }
             if (reportWarning != null && !res.CheckPayload(expResponse))

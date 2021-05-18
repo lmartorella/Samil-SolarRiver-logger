@@ -137,15 +137,15 @@ namespace Lucky.Home.Devices.Solar
         private async Task<string> Exec(HalfDuplexLineSink sink, string opName, SamilMsg request, SamilMsg expResponse, bool echo)
         {
             string err = null;
-            var resp = await CheckProtocolWRes(sink, opName, request, expResponse, (er, data, msg) => 
+            var resp = await CheckProtocolWRes(sink, opName, request, expResponse, (dataError, lineError, data, msg) => 
                 {
-                    if (er != HalfDuplexLineSink.Error.Ok)
+                    if (lineError != HalfDuplexLineSink.Error.Ok)
                     {
-                        err = "ERR: " + er;
+                        err = "ERR: " + dataError + ": " + lineError;
                     }
                     else
                     {
-                        err = "ERR: rcvd " + ToString(data);
+                        err = "ERR: " + dataError + ", rcvd: " + ToString(data);
                     }
                 }, null, echo);
             if (resp != null)

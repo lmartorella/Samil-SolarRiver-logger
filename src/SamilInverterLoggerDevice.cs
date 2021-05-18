@@ -233,7 +233,7 @@ namespace Lucky.Home.Devices.Solar
         private bool CheckProtocol(HalfDuplexLineSink line, SamilMsg request, SamilMsg expResponse, string phase, bool checkPayload)
         {
             Action<SamilMsg> warn = checkPayload ? (Action<SamilMsg>)(w => ReportWarning("Strange payload " + phase, w)) : null;
-            return (CheckProtocolWRes(line, phase, request, expResponse, (err, bytes, msg) => ReportFault("Unexpected " + phase, bytes, msg, err), warn)) != null;
+            return (CheckProtocolWRes(line, phase, request, expResponse, (dataError, lineError, bytes, msg) => ReportFault(dataError + " in phase " + phase, bytes, msg, lineError), warn)) != null;
         }
 
         private async Task LogoutInverter(HalfDuplexLineSink line = null)
@@ -247,7 +247,7 @@ namespace Lucky.Home.Devices.Solar
                 // Send 3 logout messages
                 for (int i = 0; i < 3; i++)
                 {
-                    var r = await line.SendReceive(LogoutMessage.ToBytes(), false, false, "logout");
+                    await line.SendReceive(LogoutMessage.ToBytes(), false, false, "logout");
                     // Ignore errors
                     await Task.Delay(500);
                 }
@@ -257,11 +257,11 @@ namespace Lucky.Home.Devices.Solar
         private async Task<bool> LoginInverter(HalfDuplexLineSink line)
         {
             await LogoutInverter(line);
-            var res = await CheckProtocolWRes(line, "bcast", BroadcastRequest, BroadcastResponse, (er, bytes, msg) =>
+            var res = await CheckProtocolWRes(line, "bcast", BroadcastRequest, BroadcastResponse, (dataError, lineError, bytes, msg) =>
                 {
                     if (!InNightMode)
                     {
-                        ReportFault("Unexpected broadcast response", bytes, msg, er);
+                        ReportFault("Unexpected broadcast response: " + dataError, bytes, msg, lineError);
                     }
                 });
             if (res == null)
@@ -332,7 +332,7 @@ namespace Lucky.Home.Devices.Solar
             }
 
             // Fetch solar power data from inverter
-            var res = await CheckProtocolWRes(line, "pv", GetPvDataMessage, GetPvDataResponse, (err, bytes, msg) => ReportFault("Unexpected PV data", bytes, msg, err));
+            var res = await CheckProtocolWRes(line, "pv", GetPvDataMessage, GetPvDataResponse, (dataError, lineError, bytes, msg) => ReportFault("Unexpected PV data: " + dataError, bytes, msg, lineError));
             if (res == null)
             {
                 // Relogin!
@@ -425,11 +425,11 @@ namespace Lucky.Home.Devices.Solar
             return ret;
         }
 
-        private void ReportFault(string reason, byte[] msg, SamilMsg message, HalfDuplexLineSink.Error err)
+        private void ReportFault(string reason, byte[] msg, SamilMsg message, HalfDuplexLineSink.Error lineError)
         {
-            if (err != HalfDuplexLineSink.Error.Ok)
+            if (lineError != HalfDuplexLineSink.Error.Ok)
             {
-                _logger.Log(reason, "Err", err);
+                _logger.Log(reason, "Err", lineError);
             }
             else if (message != null)
             {
