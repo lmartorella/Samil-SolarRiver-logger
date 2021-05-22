@@ -104,7 +104,8 @@ namespace Lucky.Home.Devices.Solar
                 {
                     throw new ApplicationException("Wrong prefix");
                 }
-                if (WordAt(dataLength - 2, data) != checksum)
+                // Strange behavior with checksum lately...
+                if (WordAt(dataLength - 2, data) != checksum && WordAt(dataLength - 2, data) != (checksum + 0x100))
                 {
                     throw new ApplicationException("Checksum error: 0x" + WordAt(dataLength - 2, data).ToString("X4") + " instead of 0x" + checksum.ToString("X4"));
                 }
